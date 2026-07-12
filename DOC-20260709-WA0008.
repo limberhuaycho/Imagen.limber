@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Studio · Generador y Lector de QR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#f4f6fb;
+  --card:#ffffff;
+  --ink:#1b1f2a;
+  --muted:#6b7280;
+  --blue:#2563eb;
+  --violet:#7c3aed;
+  --line:#e6e9f2;
+  --shadow:0 10px 30px -12px rgba(30,41,59,.18);
+  --radius:18px;
+  --radius-sm:12px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(37,99,235,.10), transparent),
+    radial-gradient(1000px 500px at 110% 10%, rgba(124,58,237,.10), transparent),
+    var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  padding:24px 16px 60px;
+}
+.wrap{max-width:1040px;margin:0 auto;}
+header.top{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  margin-bottom:22px; flex-wrap:wrap;
+}
+.brand{display:flex; align-items:center; gap:12px;}
+.brand .logo-mark{
+  width:44px;height:44px;border-radius:12px;
+  background:linear-gradient(135deg,var(--blue),var(--violet));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;
+  box-shadow:var(--shadow);
+}
+.brand h1{font-size:20px;margin:0;letter-spacing:.2px;}
+.brand p{margin:0;color:var(--muted);font-size:13px;}
+
+.tabs{
+  display:flex;gap:6px;background:#eef1f8;padding:6px;border-radius:14px;
+}
+.tab-btn{
+  border:none;background:transparent;padding:10px 18px;border-radius:10px;
+  font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;
+  transition:all .25s ease;
+}
+.tab-btn.active{
+  background:#fff;color:var(--ink);box-shadow:var(--shadow);
+}
+.tab-btn:hover{color:var(--ink);}
+
+.panel{display:none;animation:fadeIn .35s ease;}
+.panel.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+.grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:20px;
+}
+@media(max-width:820px){.grid{grid-template-columns:1fr;}}
+
+.card{
+  background:var(--card);border-radius:var(--radius);padding:22px;
+  box-shadow:var(--shadow);border:1px solid var(--line);
+}
+.card h2{margin:0 0 14px;font-size:16px;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:6px;}
+.field input[type=text],
+.field input[type=number],
+.field input[type=email],
+.field input[type=tel],
+.field input[type=date],
+.field input[type=time],
+.field input[type=url],
+.field textarea,
+.field select{
+  width:100%;padding:11px 13px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--line);font-size:14px;font-family:inherit;
+  background:#fbfcff;transition:border-color .2s, box-shadow .2s;
+  color:var(--ink);
+}
+.field textarea{min-height:110px;resize:vertical;}
+.field input:focus,.field select:focus,.field textarea:focus{
+  outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12);
+}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+@media(max-width:480px){.row2{grid-template-columns:1fr;}}
+
+.chip-group{display:flex;gap:8px;flex-wrap:wrap;}
+.chip{
+  padding:9px 14px;border-radius:999px;border:1.5px solid var(--line);
+  background:#fbfcff;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);
+  transition:all .2s ease;
+}
+.chip:hover{border-color:var(--blue);color:var(--ink);}
+.chip.active{
+  background:linear-gradient(135deg,var(--blue),var(--violet));
+  color:#fff;border-color:transparent;box-shadow:0 6px 16px -6px rgba(37,99,235,.55);
+}
+.color-dot{
+  width:34px;height:34px;border-radius:50%;border:2.5px solid #fff;
+  box-shadow:0 0 0 1.5px var(--line);cursor:pointer;transition:transform .2s;
+}
+.color-dot:hover{transform:scale(1.1);}
+.color-dot.active{box-shadow:0 0 0 2.5px var(--ink);}
+.color-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+
+.btn{
+  border:none;border-radius:var(--radius-sm);padding:12px 20px;font-size:14px;font-weight:700;
+  cursor:pointer;transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+  display:inline-flex;align-items:center;gap:8px;
+}
+.btn:active{transform:scale(.97);}
+.btn-primary{
+  background:linear-gradient(135deg,var(--blue),var(--violet));color:#fff;
+  box-shadow:0 8px 20px -8px rgba(37,99,235,.6);
+}
+.btn-primary:hover{box-shadow:0 10px 24px -8px rgba(37,99,235,.75);}
+.btn-outline{
+  background:#fff;color:var(--ink);border:1.5px solid var(--line);
+}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue);}
+.btn-block{width:100%;justify-content:center;}
+.btn[disabled]{opacity:.5;cursor:not-allowed;}
+
+.preview-card{display:flex;flex-direction:column;align-items:center;gap:16px;}
+.qr-stage{
+  width:100%;display:flex;align-items:center;justify-content:center;
+  background:
+    linear-gradient(135deg,#fbfcff,#f1f4fb);
+  border-radius:var(--radius);padding:18px;min-height:280px;
+  border:1.5px dashed var(--line);
+}
+#qrCanvas{max-width:100%;height:auto;border-radius:10px;}
+.hint{color:var(--muted);font-size:12.5px;text-align:center;}
+.logo-options{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;}
+.file-btn{
+  display:inline-flex;align-items:center;gap:8px;padding:9px 14px;border-radius:var(--radius-sm);
+  border:1.5px dashed var(--line);cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);
+  background:#fbfcff;
+}
+.file-btn:hover{border-color:var(--blue);color:var(--blue);}
+.file-btn input{display:none;}
+
+.icon{width:18px;height:18px;flex:none;}
+
+.scan-choice{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.scan-choice .btn{flex:1;min-width:170px;}
+#readerBox{
+  width:100%;border-radius:var(--radius);overflow:hidden;border:1.5px solid var(--line);
+  display:none;background:#000;
+}
+#readerBox.active{display:block;}
+#qr-reader{width:100%;}
+
+.result-card{
+  margin-top:18px;border-radius:var(--radius);border:1.5px solid var(--line);
+  background:linear-gradient(180deg,#fbfcff,#fff);padding:20px;display:none;
+  animation:fadeIn .35s ease;
+}
+.result-card.active{display:block;}
+.result-top{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.result-badge{
+  background:linear-gradient(135deg,var(--blue),var(--violet));color:#fff;font-size:12px;
+  font-weight:700;padding:5px 12px;border-radius:999px;
+}
+.result-row{
+  display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid var(--line);
+  font-size:14px;
+}
+.result-row:last-of-type{border-bottom:none;}
+.result-row .k{color:var(--muted);font-weight:600;min-width:110px;}
+.result-row .v{text-align:right;word-break:break-word;}
+.result-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+.content-box{
+  background:#f6f8fd;border-radius:var(--radius-sm);padding:12px 14px;font-size:13.5px;
+  white-space:pre-wrap;word-break:break-word;margin-top:8px;color:#374151;
+}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;}
+
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:#fff;padding:12px 20px;border-radius:12px;font-size:13.5px;
+  box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:all .3s ease;z-index:999;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <div class="logo-mark">QR</div>
+      <div>
+        <h1>QR Studio</h1>
+        <p>Generador y lector de códigos QR</p>
+      </div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="gen">Generar QR</button>
+      <button class="tab-btn" data-tab="read">Leer QR</button>
+    </div>
+  </header>
+
+  <!-- ================= GENERAR ================= -->
+  <section class="panel active" id="panel-gen">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>1. Tipo de contenido</h2>
+          <div class="field">
+            <select id="typeSelect">
+              <option value="text">Texto plano</option>
+              <option value="url">URL o enlace</option>
+              <option value="tel">Número telefónico</option>
+              <option value="email">Correo electrónico</option>
+              <option value="sms">SMS</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="telegram">Telegram</option>
+              <option value="geo">Ubicación</option>
+              <option value="wifi">WiFi</option>
+              <option value="vcard">Tarjeta de contacto (vCard)</option>
+              <option value="event">Evento de calendario</option>
+              <option value="payment">Información de pagos</option>
+              <option value="crypto">Criptomonedas</option>
+            </select>
+          </div>
+          <div id="dynamicFields"></div>
+        </div>
+
+        <div class="card" style="margin-top:18px;">
+          <h2>2. Estilo del QR</h2>
+          <div class="chip-group" id="styleChips">
+            <button class="chip active" data-style="classic">QR Clásico</button>
+            <button class="chip" data-style="rounded">QR Redondeado</button>
+            <button class="chip" data-style="heart">QR Corazón</button>
+            <button class="chip" data-style="heartframe">QR en Corazón</button>
+          </div>
+          <div style="margin-top:14px;">
+            <label style="display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px;">Color</label>
+            <div class="color-row" id="colorRow"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:18px;">
+          <h2>3. Logotipo central</h2>
+          <div class="chip-group">
+            <button class="chip" data-logo="none">Sin imagen</button>
+            <button class="chip active" data-logo="lr">Usar logo LR</button>
+            <button class="chip" data-logo="custom">Elegir imagen</button>
+          </div>
+          <div class="logo-options">
+            <label class="file-btn" id="logoFileBtn" style="display:none;">
+              <input type="file" id="logoFile" accept="image/*">
+              📁 Seleccionar imagen desde la computadora
+            </label>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block" id="generateBtn" style="margin-top:20px;">✨ Generar código QR</button>
+      </div>
+
+      <div>
+        <div class="card preview-card">
+          <div class="qr-stage"><canvas id="qrCanvas" width="360" height="360"></canvas></div>
+          <p class="hint">El tamaño se ajusta automáticamente según la cantidad de información. Nivel de corrección de errores: alto (H).</p>
+          <button class="btn btn-outline btn-block" id="downloadBtn" disabled>⬇️ Descargar PNG</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= LEER ================= -->
+  <section class="panel" id="panel-read">
+    <div class="card">
+      <h2>Leer código QR</h2>
+      <div class="scan-choice">
+        <button class="btn btn-primary" id="camBtn">📷 Desde cámara</button>
+        <label class="btn btn-outline" for="galleryFile" style="cursor:pointer;">🖼️ Desde galería
+          <input type="file" id="galleryFile" accept="image/*" style="display:none;">
+        </label>
+      </div>
+      <div id="readerBox"><div id="qr-reader"></div></div>
+      <div class="result-card" id="resultCard">
+        <div class="result-top">
+          <span class="result-badge" id="resTypeBadge">Tipo</span>
+        </div>
+        <div id="resultRows"></div>
+        <div class="content-box" id="resultContentBox"></div>
+        <div class="result-actions" id="resultActions"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>QR Studio — creado con HTML, CSS y JavaScript puro.</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   LOGO POR DEFECTO (LR) EN BASE64
+   ============================================================ */
+const DEFAULT_LOGO_SRC = "data:image/jpeg;base64,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";
+
+/* ============================================================
+   UTILIDADES
+   ============================================================ */
+function $(sel,ctx){return (ctx||document).querySelector(sel);}
+function $all(sel,ctx){return Array.from((ctx||document).querySelectorAll(sel));}
+function esc(s){return (s||"").toString();}
+function showToast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(showToast._tm);
+  showToast._tm=setTimeout(()=>t.classList.remove('show'),2600);
+}
+function pad2(n){return n.toString().padStart(2,'0');}
+
+/* ============================================================
+   TABS
+   ============================================================ */
+$all('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    $all('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    $all('.panel').forEach(p=>p.classList.remove('active'));
+    $('#panel-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab!=='read'){ stopCamera(); }
+  });
+});
+
+/* ============================================================
+   CAMPOS DINÁMICOS POR TIPO
+   ============================================================ */
+const FIELhoneypot = null;
+const FIELD_DEFS = {
+  text: [{id:'text_value',label:'Texto',type:'textarea',placeholder:'Escribe cualquier texto...'}],
+  url: [{id:'url_value',label:'URL',type:'text',placeholder:'https://ejemplo.com'}],
+  tel: [{id:'tel_value',label:'Número (con código de país)',type:'text',placeholder:'+59170000000'}],
+  email: [
+    {id:'email_to',label:'Correo',type:'text',placeholder:'correo@ejemplo.com'},
+    {id:'email_subject',label:'Asunto',type:'text',placeholder:'Asunto del mensaje'},
+    {id:'email_body',label:'Mensaje',type:'textarea',placeholder:'Escribe el mensaje...'}
+  ],
+  sms: [
+    {id:'sms_number',label:'Número',type:'text',placeholder:'+59170000000'},
+    {id:'sms_message',label:'Mensaje',type:'textarea',placeholder:'Escribe el mensaje...'}
+  ],
+  whatsapp: [
+    {id:'wa_number',label:'Número (con código de país) o pega tu link',type:'text',placeholder:'+59170000000 ó https://wa.me/59170000000'},
+    {id:'wa_message',label:'Mensaje predeterminado (opcional)',type:'textarea',placeholder:'Hola, quiero más información...'}
+  ],
+  telegram: [
+    {id:'tg_user',label:'Usuario de Telegram o pega tu link',type:'text',placeholder:'usuario ó https://t.me/usuario'}
+  ],
+  geo: [
+    {id:'geo_lat',label:'Latitud',type:'text',placeholder:'-17.783300'},
+    {id:'geo_lng',label:'Longitud',type:'text',placeholder:'-63.182100'}
+  ],
+  wifi: [
+    {id:'wifi_ssid',label:'Nombre de red (SSID)',type:'text',placeholder:'MiRedWiFi'},
+    {id:'wifi_pass',label:'Contraseña',type:'text',placeholder:'••••••••'},
+    {id:'wifi_sec',label:'Tipo de seguridad',type:'select',options:[['WPA','WPA'],['WPA2','WPA2'],['WPA3','WPA3'],['WEP','WEP'],['nopass','Sin contraseña']]}
+  ],
+  vcard: [
+    {id:'vc_nombre',label:'Nombre',type:'text'},
+    {id:'vc_apellido',label:'Apellido',type:'text'},
+    {id:'vc_empresa',label:'Empresa',type:'text'},
+    {id:'vc_cargo',label:'Cargo',type:'text'},
+    {id:'vc_tel',label:'Teléfono',type:'text'},
+    {id:'vc_cel',label:'Celular',type:'text'},
+    {id:'vc_email',label:'Correo',type:'text'},
+    {id:'vc_web',label:'Sitio web',type:'text'},
+    {id:'vc_dir',label:'Dirección',type:'text'},
+    {id:'vc_ciudad',label:'Ciudad',type:'text'},
+    {id:'vc_pais',label:'País',type:'text'}
+  ],
+  event: [
+    {id:'ev_titulo',label:'Título',type:'text'},
+    {id:'ev_lugar',label:'Lugar',type:'text'},
+    {id:'ev_fecha_ini',label:'Fecha inicio',type:'date'},
+    {id:'ev_hora_ini',label:'Hora inicio',type:'time'},
+    {id:'ev_fecha_fin',label:'Fecha fin',type:'date'},
+    {id:'ev_hora_fin',label:'Hora fin',type:'time'},
+    {id:'ev_desc',label:'Descripción',type:'textarea'}
+  ],
+  payment: [
+    {id:'pay_nombre',label:'Nombre',type:'text'},
+    {id:'pay_banco',label:'Banco',type:'text'},
+    {id:'pay_cuenta',label:'Cuenta',type:'text'},
+    {id:'pay_ref',label:'Referencia',type:'text'},
+    {id:'pay_monto',label:'Monto',type:'text'},
+    {id:'pay_obs',label:'Observaciones',type:'textarea'}
+  ],
+  crypto: [
+    {id:'cr_moneda',label:'Criptomoneda',type:'select',options:[['bitcoin','Bitcoin'],['ethereum','Ethereum'],['litecoin','Litecoin'],['usdt','USDT'],['solana','Solana']]},
+    {id:'cr_dir',label:'Dirección',type:'text'},
+    {id:'cr_monto',label:'Cantidad (opcional)',type:'text'}
+  ]
+};
+
+function renderFields(type){
+  const cont = $('#dynamicFields');
+  cont.innerHTML = '';
+  const defs = FIELD_DEFS[type] || [];
+  defs.forEach(f=>{
+    const wrap = document.createElement('div');
+    wrap.className='field';
+    let inner = `<label for="${f.id}">${f.label}</label>`;
+    if(f.type==='textarea'){
+      inner += `<textarea id="${f.id}" placeholder="${f.placeholder||''}"></textarea>`;
+    }else if(f.type==='select'){
+      inner += `<select id="${f.id}">` + f.options.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('') + `</select>`;
+    }else{
+      inner += `<input type="${f.type}" id="${f.id}" placeholder="${f.placeholder||''}">`;
+    }
+    wrap.innerHTML = inner;
+    cont.appendChild(wrap);
+  });
+}
+$('#typeSelect').addEventListener('change', e=>renderFields(e.target.value));
+renderFields('text');
+
+/* ============================================================
+   CONSTRUCCIÓN DEL CONTENIDO SEGÚN TIPO
+   ============================================================ */
+function val(id){ const el=document.getElementById(id); return el? el.value.trim() : ''; }
+
+function buildData(type){
+  switch(type){
+    case 'text':
+      return val('text_value');
+    case 'url':{
+      let u = val('url_value');
+      if(u && !/^https?:\/\//i.test(u)) u = 'https://'+u;
+      return u;
+    }
+    case 'tel':
+      return 'tel:'+val('tel_value').replace(/\s+/g,'');
+    case 'email':{
+      const to=val('email_to'), subj=encodeURIComponent(val('email_subject')), body=encodeURIComponent(val('email_body'));
+      return `mailto:${to}?subject=${subj}&body=${body}`;
+    }
+    case 'sms':
+      return `SMSTO:${val('sms_number')}:${val('sms_message')}`;
+    case 'whatsapp':{
+      let v = val('wa_number');
+      if(!v) return '';
+      if(/^https?:\/\//i.test(v)) return v; // ya es un link, no autocompletar
+      const digits = v.replace(/[^\d]/g,'');
+      const msg = val('wa_message');
+      return `https://wa.me/${digits}` + (msg ? `?text=${encodeURIComponent(msg)}` : '');
+    }
+    case 'telegram':{
+      let v = val('tg_user');
+      if(!v) return '';
+      if(/^https?:\/\//i.test(v)) return v; // ya es un link, no autocompletar
+      const user = v.replace(/^@/,'').trim();
+      return `https://t.me/${user}`;
+    }
+    case 'geo':
+      return `geo:${val('geo_lat')},${val('geo_lng')}`;
+    case 'wifi':{
+      const ssid=val('wifi_ssid'), pass=val('wifi_pass'), sec=val('wifi_sec');
+      const secTag = sec==='nopass' ? 'nopass' : sec;
+      return `WIFI:T:${secTag};S:${ssid};P:${sec==='nopass'?'':pass};;`;
+    }
+    case 'vcard':{
+      return [
+        'BEGIN:VCARD','VERSION:3.0',
+        `N:${val('vc_apellido')};${val('vc_nombre')};;;`,
+        `FN:${val('vc_nombre')} ${val('vc_apellido')}`,
+        val('vc_empresa') ? `ORG:${val('vc_empresa')}` : '',
+        val('vc_cargo') ? `TITLE:${val('vc_cargo')}` : '',
+        val('vc_tel') ? `TEL;TYPE=WORK,VOICE:${val('vc_tel')}` : '',
+        val('vc_cel') ? `TEL;TYPE=CELL:${val('vc_cel')}` : '',
+        val('vc_email') ? `EMAIL:${val('vc_email')}` : '',
+        val('vc_web') ? `URL:${val('vc_web')}` : '',
+        (val('vc_dir')||val('vc_ciudad')||val('vc_pais')) ? `ADR:;;${val('vc_dir')};${val('vc_ciudad')};;;${val('vc_pais')}` : '',
+        'END:VCARD'
+      ].filter(Boolean).join('\n');
+    }
+    case 'event':{
+      const fmt=(d,t)=> (d? d.replace(/-/g,'') : '') + 'T' + (t? t.replace(/:/g,'')+'00' : '000000');
+      return [
+        'BEGIN:VEVENT',
+        `SUMMARY:${val('ev_titulo')}`,
+        val('ev_lugar') ? `LOCATION:${val('ev_lugar')}` : '',
+        `DTSTART:${fmt(val('ev_fecha_ini'),val('ev_hora_ini'))}`,
+        `DTEND:${fmt(val('ev_fecha_fin')||val('ev_fecha_ini'),val('ev_hora_fin'))}`,
+        val('ev_desc') ? `DESCRIPTION:${val('ev_desc')}` : '',
+        'END:VEVENT'
+      ].filter(Boolean).join('\n');
+    }
+    case 'payment':{
+      return [
+        'INFORMACIÓN DE PAGO',
+        val('pay_nombre') && `Nombre: ${val('pay_nombre')}`,
+        val('pay_banco') && `Banco: ${val('pay_banco')}`,
+        val('pay_cuenta') && `Cuenta: ${val('pay_cuenta')}`,
+        val('pay_ref') && `Referencia: ${val('pay_ref')}`,
+        val('pay_monto') && `Monto: ${val('pay_monto')}`,
+        val('pay_obs') && `Observaciones: ${val('pay_obs')}`
+      ].filter(Boolean).join('\n');
+    }
+    case 'crypto':{
+      const moneda = val('cr_moneda');
+      const dir = val('cr_dir');
+      const monto = val('cr_monto');
+      const scheme = {bitcoin:'bitcoin',ethereum:'ethereum',litecoin:'litecoin',usdt:'usdt',solana:'solana'}[moneda] || 'bitcoin';
+      return `${scheme}:${dir}` + (monto ? `?amount=${monto}` : '');
+    }
+    default: return '';
+  }
+}
+
+/* ============================================================
+   ESTILOS Y COLORES
+   ============================================================ */
+let currentStyle = 'classic';
+let currentColor = '#000000';
+const COLOR_PALETTE = [
+  ['#000000','Negro'],
+  ['#2563eb','Azul'],
+  ['#8b5cf6','Lila'],
+  ['#ef4444','Rojo'],
+  ['#ec4899','Rosa'],
+  ['#16a34a','Verde'],
+  ['#f97316','Naranja']
+];
+const STYLE_DEFAULT_COLOR = {classic:'#000000', rounded:'#000000', heart:'#ef4444', heartframe:'#ef4444'};
+
+function renderColorRow(){
+  const row = $('#colorRow');
+  row.innerHTML='';
+  const list = COLOR_PALETTE;
+  currentColor = STYLE_DEFAULT_COLOR[currentStyle];
+  list.forEach(([hex,name])=>{
+    const d=document.createElement('div');
+    d.className='color-dot'+(hex===currentColor?' active':'');
+    d.style.background=hex;
+    d.title=name;
+    d.addEventListener('click',()=>{
+      currentColor=hex;
+      $all('.color-dot',row).forEach(x=>x.classList.remove('active'));
+      d.classList.add('active');
+    });
+    row.appendChild(d);
+  });
+}
+renderColorRow();
+
+$all('.chip[data-style]').forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    $all('.chip[data-style]').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    currentStyle = chip.dataset.style;
+    renderColorRow();
+  });
+});
+
+/* ============================================================
+   LOGO
+   ============================================================ */
+let logoMode='lr';
+let customLogoImg=null;
+$all('.chip[data-logo]').forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    $all('.chip[data-logo]').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    logoMode=chip.dataset.logo;
+    $('#logoFileBtn').style.display = logoMode==='custom' ? 'inline-flex' : 'none';
+  });
+});
+
+$('#logoFile').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    const img = new Image();
+    img.onload = ()=>{ customLogoImg = img; };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+/* ============================================================
+   GENERACIÓN DEL QR (dibujo personalizado en canvas)
+   ============================================================ */
+function pickTypeNumber(dataLength){
+  // Deja que la librería determine automáticamente (0 = auto)
+  return 0;
+}
+
+function drawRoundedRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawHeartPath(ctx,cx,cy,size){
+  // dibuja un corazón real (silueta clásica) centrado en (cx,cy), ancho/alto ~= size
+  const x = cx - size/2;
+  const y = cy - size/2;
+  const topCurveHeight = size*0.32;
+  ctx.beginPath();
+  ctx.moveTo(cx, y + topCurveHeight);
+  // lóbulo superior izquierdo
+  ctx.bezierCurveTo(cx, y, x, y, x, y + topCurveHeight);
+  // curva inferior izquierda hacia la punta
+  ctx.bezierCurveTo(x, y + (size + topCurveHeight) / 2, cx, y + (size + topCurveHeight) / 1.4, cx, y + size);
+  // curva inferior derecha desde la punta
+  ctx.bezierCurveTo(cx, y + (size + topCurveHeight) / 1.4, x + size, y + (size + topCurveHeight) / 2, x + size, y + topCurveHeight);
+  // lóbulo superior derecho
+  ctx.bezierCurveTo(x + size, y, cx, y, cx, y + topCurveHeight);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function isFinderModule(row,col,count){
+  const inTL = row<7 && col<7;
+  const inTR = row<7 && col>=count-7;
+  const inBL = row>=count-7 && col<7;
+  return inTL || inTR || inBL;
+}
+
+// dibuja el "ojo" (posición): cuadrado externo + punto interno.
+// En estilo "classic" se dibuja con esquinas rectas (el QR tradicional que casi todos usan);
+// en el resto de estilos se usan esquinas redondeadas.
+function drawEye(ctx, x, y, cellSize, color, style){
+  const outer = cellSize*7;
+  const isClassic = (style==='classic');
+  const r1 = isClassic ? 0 : cellSize*1.6;
+  const r2 = isClassic ? 0 : cellSize*1.1;
+  ctx.fillStyle = color;
+  drawRoundedRect(ctx, x, y, outer, outer, r1);
+  ctx.fillStyle = '#ffffff';
+  drawRoundedRect(ctx, x+cellSize, y+cellSize, outer-cellSize*2, outer-cellSize*2, r1*0.7);
+  ctx.fillStyle = color;
+  drawRoundedRect(ctx, x+cellSize*2, y+cellSize*2, outer-cellSize*4, outer-cellSize*4, r2);
+}
+
+function buildQRModel(dataStr){
+  const qr = qrcode(0, 'H');
+  qr.addData(dataStr, 'Byte');
+  qr.make();
+  return qr;
+}
+
+function renderQR(dataStr, style, color){
+  if(!dataStr){ showToast('Completa los campos antes de generar el QR.'); return null; }
+  const qr = buildQRModel(dataStr);
+  const count = qr.getModuleCount();
+
+  const cell = 10; // tamaño base por módulo
+  const quiet = 4; // zona de silencio en módulos
+  const inner = count*cell;
+  const margin = quiet*cell;
+
+  const isFrame = (style==='heartframe');
+  const canvasSize = isFrame ? inner + margin*2 + Math.round(inner*0.5) : inner + margin*2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasSize;
+  canvas.height = canvasSize;
+  const ctx = canvas.getContext('2d');
+
+  // fondo blanco
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,canvasSize,canvasSize);
+
+  const offsetX = (canvasSize - inner)/2;
+  const offsetY = (canvasSize - inner)/2;
+
+  // Si es "QR en corazón": dibujar corazón decorativo grande de fondo primero
+  if(isFrame){
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    // corazón grande de contorno relleno con textura de puntos, detrás del QR
+    const heartSize = canvasSize*0.98;
+    // máscara: dibujamos muchos corazones pequeños dispersos dentro del área del corazón grande,
+    // pero fuera del cuadro donde irá el QR real.
+    const cx = canvasSize/2, cy = canvasSize/2 + canvasSize*0.03;
+    // función para saber si un punto está dentro del corazón grande (aprox, usando ecuación implícita)
+    function inHeart(px,py){
+      const x = (px-cx)/(heartSize*0.5);
+      const y = -(py-cy)/(heartSize*0.5) + 0.25;
+      const eq = Math.pow(x*x+y*y-1,3) - x*x*y*y*y;
+      return eq <= 0;
+    }
+    const qrLeft = offsetX-margin*0.4, qrTop = offsetY-margin*0.4, qrRight = offsetX+inner+margin*0.4, qrBottom = offsetY+inner+margin*0.4;
+    ctx.fillStyle = color;
+    const step = cell*0.85;
+    let seed = 42;
+    function rnd(){ seed = (seed*9301+49297)%233280; return seed/233280; }
+    for(let py=0; py<canvasSize; py+=step){
+      for(let px=0; px<canvasSize; px+=step){
+        const jx = px + (rnd()-0.5)*step*0.6;
+        const jy = py + (rnd()-0.5)*step*0.6;
+        if(jx>=qrLeft && jx<=qrRight && jy>=qrTop && jy<=qrBottom) continue; // deja libre el área del QR
+        if(inHeart(jx,jy) && rnd()>0.25){
+          drawHeartPath(ctx, jx, jy, step*0.85*(0.6+rnd()*0.5));
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  // Dibujar módulos del QR
+  for(let row=0; row<count; row++){
+    for(let col=0; col<count; col++){
+      if(!qr.isDark(row,col)) continue;
+      const x = offsetX + col*cell;
+      const y = offsetY + row*cell;
+      ctx.fillStyle = color;
+
+      if(isFinderModule(row,col,count)){
+        continue; // los ojos se dibujan aparte
+      }
+
+      if(style==='classic'){
+        ctx.fillRect(x, y, cell, cell);
+      } else if(style==='rounded'){
+        drawRoundedRect(ctx, x+cell*0.08, y+cell*0.08, cell*0.84, cell*0.84, cell*0.32);
+      } else { // heart / heartframe -> módulos en forma de corazón
+        drawHeartPath(ctx, x+cell/2, y+cell/2, cell*1.05);
+      }
+    }
+  }
+
+  // Dibujar los 3 ojos de posición encima, estilo moderno unificado
+  const eyePositions = [[0,0],[0,count-7],[count-7,0]];
+  eyePositions.forEach(([r,c])=>{
+    drawEye(ctx, offsetX+c*cell, offsetY+r*cell, cell, color, style);
+  });
+
+  // Logotipo central
+  const wantsLogo = logoMode!=='none';
+  const logoImg = wantsLogo ? ((logoMode==='custom' && customLogoImg) ? customLogoImg : defaultLogoImg) : null;
+  if(logoImg){
+    // Tamaño del logo en CANTIDAD FIJA DE MÓDULOS (no en % del área), igual en todos los QR.
+    // Así, en un QR con muchos módulos el logo se ve proporcionalmente más pequeño y en uno
+    // con pocos módulos se ve proporcionalmente más grande (igual que apps de pago tipo Yape).
+    // Se limita a un máximo seguro (~30% del ancho) para no romper la lectura con corrección H.
+    const LOGO_MODULES = 20;
+    const logoModules = Math.min(LOGO_MODULES, Math.floor(count*0.30));
+    const logoSize = logoModules*cell;
+    const lx = offsetX + inner/2 - logoSize/2;
+    const ly = offsetY + inner/2 - logoSize/2;
+    const pad = logoSize*0.14;
+    ctx.fillStyle = '#ffffff';
+    drawRoundedRect(ctx, lx-pad, ly-pad, logoSize+pad*2, logoSize+pad*2, (logoSize+pad*2)*0.22);
+    ctx.save();
+    drawRoundedRect(ctx, lx, ly, logoSize, logoSize, logoSize*0.18);
+    ctx.clip();
+    ctx.drawImage(logoImg, lx, ly, logoSize, logoSize);
+    ctx.restore();
+  }
+
+  return canvas;
+}
+
+/* precarga logo por defecto */
+let defaultLogoImg = null;
+(function preloadLogo(){
+  const img = new Image();
+  img.onload = ()=>{ defaultLogoImg = img; };
+  img.src = DEFAULT_LOGO_SRC;
+})();
+
+/* ============================================================
+   BOTÓN GENERAR
+   ============================================================ */
+let lastCanvas = null;
+$('#generateBtn').addEventListener('click', ()=>{
+  const type = $('#typeSelect').value;
+  const data = buildData(type);
+  if(!data || !data.trim() || data.trim()===`tel:` || /^geo:,$/.test(data)){
+    showToast('Por favor completa la información requerida.');
+    return;
+  }
+  const canvas = renderQR(data, currentStyle, currentColor);
+  if(!canvas) return;
+  lastCanvas = canvas;
+  const display = $('#qrCanvas');
+  display.width = canvas.width;
+  display.height = canvas.height;
+  const dctx = display.getContext('2d');
+  dctx.clearRect(0,0,display.width,display.height);
+  dctx.drawImage(canvas,0,0);
+  $('#downloadBtn').disabled = false;
+  showToast('¡Código QR generado con éxito!');
+});
+
+/* ============================================================
+   DESCARGA CON NOMBRE ÚNICO
+   ============================================================ */
+let lastDownloadKey = '';
+let lastDownloadCount = 0;
+$('#downloadBtn').addEventListener('click', ()=>{
+  if(!lastCanvas) return;
+  const now = new Date();
+  const dd = pad2(now.getDate());
+  const mm = pad2(now.getMonth()+1);
+  const aa = pad2(now.getFullYear()%100);
+  const hh = pad2(now.getHours());
+  const mi = pad2(now.getMinutes());
+  const ss = pad2(now.getSeconds());
+  const key = `${dd}${mm}${aa}${hh}${mi}${ss}`;
+
+  if(key===lastDownloadKey){
+    lastDownloadCount++;
+  }else{
+    lastDownloadKey = key;
+    lastDownloadCount = 0;
+  }
+  const suffix = lastDownloadCount>0 ? `_${pad2(lastDownloadCount)}` : '';
+  const filename = `QRLIMBERW${key}${suffix}.png`;
+
+  lastCanvas.toBlob(blob=>{
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Descargado como '+filename);
+  }, 'image/png');
+});
+
+/* ============================================================
+   LECTOR QR
+   ============================================================ */
+let html5QrCode = null;
+let cameraActive = false;
+
+function stopCamera(){
+  if(html5QrCode && cameraActive){
+    html5QrCode.stop().then(()=>{
+      html5QrCode.clear();
+      cameraActive=false;
+      $('#readerBox').classList.remove('active');
+    }).catch(()=>{});
+  }
+}
+
+$('#camBtn').addEventListener('click', async ()=>{
+  const box = $('#readerBox');
+  if(cameraActive){ stopCamera(); $('#camBtn').textContent='📷 Desde cámara'; return; }
+  box.classList.add('active');
+  $('#qr-reader').innerHTML = '';
+  html5QrCode = new Html5Qrcode('qr-reader');
+  try{
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText)=>{ handleScanResult(decodedText); },
+      ()=>{}
+    );
+    cameraActive = true;
+    $('#camBtn').textContent = '⏹️ Detener cámara';
+  }catch(err){
+    showToast('No se pudo acceder a la cámara.');
+    box.classList.remove('active');
+  }
+});
+
+$('#galleryFile').addEventListener('change', async e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const tempId = 'qr-reader-file-temp';
+  let tempDiv = document.getElementById(tempId);
+  if(!tempDiv){
+    tempDiv = document.createElement('div');
+    tempDiv.id = tempId;
+    tempDiv.style.display = 'none';
+    document.body.appendChild(tempDiv);
+  }
+  const scanner = new Html5Qrcode(tempId);
+  try{
+    const result = await scanner.scanFile(file, true);
+    handleScanResult(result);
+  }catch(err){
+    showToast('No se pudo leer ningún código QR en la imagen.');
+  }finally{
+    try{ scanner.clear(); }catch(e2){}
+  }
+  e.target.value = '';
+});
+
+/* ============================================================
+   INTERPRETACIÓN DEL RESULTADO
+   ============================================================ */
+function handleScanResult(text){
+  stopCamera();
+  $('#camBtn').textContent = '📷 Desde cámara';
+  const now = new Date();
+  const fecha = `${pad2(now.getDate())}/${pad2(now.getMonth()+1)}/${now.getFullYear()}`;
+  const hora = `${pad2(now.getHours())}:${pad2(now.getMinutes())}:${pad2(now.getSeconds())}`;
+
+  let tipo = 'Texto';
+  let rows = [];
+  let actions = [];
+
+  if(/^https?:\/\/(wa\.me|api\.whatsapp\.com)\//i.test(text)){
+    tipo = 'WhatsApp';
+    actions.push(`<a class="btn btn-primary" href="${text}" target="_blank" rel="noopener">💬 Abrir WhatsApp</a>`);
+  }else if(/^https?:\/\/t\.me\//i.test(text)){
+    tipo = 'Telegram';
+    actions.push(`<a class="btn btn-primary" href="${text}" target="_blank" rel="noopener">✈️ Abrir Telegram</a>`);
+  }else if(/^https?:\/\//i.test(text)){
+    tipo = 'URL / Enlace';
+    actions.push(`<a class="btn btn-primary" href="${text}" target="_blank" rel="noopener">🔗 Abrir enlace</a>`);
+  }else if(/^tel:/i.test(text)){
+    tipo = 'Teléfono';
+    const num = text.replace(/^tel:/i,'');
+    rows.push(['Número', num]);
+    actions.push(`<a class="btn btn-primary" href="${text}">📞 Llamar</a>`);
+  }else if(/^mailto:/i.test(text)){
+    tipo = 'Correo electrónico';
+    actions.push(`<a class="btn btn-primary" href="${text}">✉️ Enviar correo</a>`);
+  }else if(/^SMSTO:/i.test(text)){
+    tipo = 'SMS';
+    const parts = text.split(':');
+    rows.push(['Número', parts[1]||'']);
+    rows.push(['Mensaje', parts.slice(2).join(':')||'']);
+  }else if(/^geo:/i.test(text)){
+    tipo = 'Ubicación';
+    const coords = text.replace(/^geo:/i,'');
+    rows.push(['Coordenadas', coords]);
+    actions.push(`<a class="btn btn-primary" href="https://www.google.com/maps?q=${coords}" target="_blank" rel="noopener">🗺️ Abrir en Google Maps</a>`);
+  }else if(/^WIFI:/i.test(text)){
+    tipo = 'Red WiFi';
+    const get = (k)=>{ const m=text.match(new RegExp(k+':([^;]*)')); return m?m[1]:''; };
+    rows.push(['SSID', get('S')]);
+    rows.push(['Seguridad', get('T')]);
+    rows.push(['Contraseña', get('P')]);
+  }else if(/^BEGIN:VCARD/i.test(text)){
+    tipo = 'Tarjeta de contacto';
+    const get = (k)=>{ const m=text.match(new RegExp(k+':([^\\n\\r]*)')); return m?m[1]:''; };
+    rows.push(['Nombre', get('FN')]);
+    rows.push(['Empresa', get('ORG')]);
+    rows.push(['Teléfono', get('TEL;TYPE=WORK,VOICE') || get('TEL')]);
+    rows.push(['Correo', get('EMAIL')]);
+  }else if(/^BEGIN:VEVENT/i.test(text)){
+    tipo = 'Evento de calendario';
+    const get = (k)=>{ const m=text.match(new RegExp(k+':([^\\n\\r]*)')); return m?m[1]:''; };
+    rows.push(['Título', get('SUMMARY')]);
+    rows.push(['Lugar', get('LOCATION')]);
+    rows.push(['Inicio', get('DTSTART')]);
+    rows.push(['Fin', get('DTEND')]);
+    rows.push(['Descripción', get('DESCRIPTION')]);
+  }else if(/^(bitcoin|ethereum|litecoin|usdt|solana):/i.test(text)){
+    tipo = 'Criptomoneda';
+    const scheme = text.split(':')[0];
+    rows.push(['Moneda', scheme]);
+    rows.push(['Dirección', text.split(':')[1]?.split('?')[0] || '']);
+  }else{
+    tipo = 'Texto plano';
+  }
+
+  rows.push(['Longitud', text.length + ' caracteres']);
+  rows.push(['Fecha', fecha]);
+  rows.push(['Hora', hora]);
+  rows.push(['Formato', tipo]);
+
+  $('#resTypeBadge').textContent = tipo;
+  $('#resultRows').innerHTML = rows.map(([k,v])=>`<div class="result-row"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`).join('');
+  $('#resultContentBox').textContent = text;
+  $('#resultActions').innerHTML = actions.join('');
+  $('#resultCard').classList.add('active');
+  showToast('Código QR leído correctamente.');
+}
+</script>
+</body>
+</html>
