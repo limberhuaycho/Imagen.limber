@@ -1,0 +1,149 @@
+rules_version = '2';
+
+// =====================================================================
+//  Appv2 - Reglas de Firestore
+//  Proyecto: wabusines1-30b95
+//
+//  MODO PRUEBA: descomenta el bloque de abajo para dejar todo abierto.
+//  Aviso: con las reglas abiertas cualquier persona con el link puede
+//  leer los codigos de verificacion. Solo usalo mientras pruebas y
+//  vuelve a activar estas reglas antes de enseñarlo.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Correo del unico administrador.
+    function esAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'limberhuaychoquispe81';
+    }
+
+    // El usuario autenticado es dueño de este documento de usuario.
+    function esDueño(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Telefono del usuario autenticado, solo digitos y con prefijo +.
+    function miTelefono() {
+      return request.auth != null && request.auth.token.phone_number != null
+        ? request.auth.token.phone_number
+        : '';
+    }
+
+    // ---------------------------------------------------------------
+    // /numeros/{clave}
+    // Un documento por numero. Sirve para responder "¿esta cuenta
+    // existe?" y para saber si la empresa ya lo verifico.
+    // clave = numero en digitos con prefijo pais, ej: 51987654321
+    // ---------------------------------------------------------------
+    match /numeros/{clave} {
+
+      // Cualquiera autenticado puede consultar si un numero existe.
+      // No se devuelven credenciales, solo la ficha publica del numero.
+      allow read: if request.auth != null;
+
+      // Crear la ficha es automatico al registrarse; el resto, solo admin.
+      allow create: if request.auth != null;
+      allow update, delete: if esAdmin();
+
+      // El usuario no puede auto-declararse verificado ni cambiar su
+      // estado de empresa. Eso lo decide el administrador.
+      allow update: if esAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['verificado', 'verificadoPor', 'nombreEmpresa',
+                       'actualizado', 'notaAdmin']);
+    }
+
+    // ---------------------------------------------------------------
+    // /codigos/{clave}
+    // Codigo de 6 digitos que el admin genera y envia por correo o
+    // WhatsApp. Solo el admin puede leerlos todos.
+    // ---------------------------------------------------------------
+    match /codigos/{clave} {
+
+      // El admin los ve todos. El usuario autenticado solo puede leer
+      // el codigo del numero que le pertenece a el.
+      allow read: if esAdmin()
+        || (request.auth != null && miTelefono() == '/' + clave);
+
+      allow create, update: if esAdmin();
+
+      // El usuario puede consumir su propio codigo (marcarlo usado),
+      // pero no puede cambiar el valor del codigo ni extender la vida.
+      allow update: if request.auth != null
+        && miTelefono() == '/' + clave
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['usado']);
+
+      allow delete: if esAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // /solicitudes/{id}
+    // Peticion de codigo que crea la app. El admin la ve en el panel.
+    // ---------------------------------------------------------------
+    match /solicitudes/{id} {
+      allow read, delete: if esAdmin();
+      allow create: if request.auth != null;
+      allow update: if esAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // /usuarios/{uid}
+    // Perfil de cada persona.
+    // ---------------------------------------------------------------
+    match /usuarios/{uid} {
+      allow read: if esDueño(uid) || esAdmin();
+      allow create, update: if esDueño(uid);
+      allow delete: if esDueño(uid) || esAdmin();
+
+      // El usuario no se puede poner a si mismo como verificado por
+      // la empresa ni cambiar el rol de admin.
+      allow update: if esDueño(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(['verificadoPorEmpresa', 'esAdmin', 'rol']);
+    }
+
+    // ---------------------------------------------------------------
+    // /mensajes/{conversacionId}/mensaje/{mensajeId}
+    // Firebase es solo el puente. Los mensajes se borran de aqui a los
+    // 7 dias (campo expira) y quedan guardados en el telefono.
+    // ---------------------------------------------------------------
+    match /mensajes/{conversacionId}/mensaje/{mensajeId} {
+      allow read: if request.auth != null;
+      // Cada quien escribe con su uid y no puede suplantar a otro.
+      allow create: if request.auth != null
+        && request.resource.data.autor == request.auth.uid
+        && request.resource.data.expira is timestamp;
+      allow update, delete: if request.auth != null
+        && resource.data.autor == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // /config/{documento}
+    // Ajustes generales del negocio, editables por el admin.
+    // ---------------------------------------------------------------
+    match /config/{documento} {
+      allow read: if true;
+      allow write: if esAdmin();
+    }
+
+    // Cualquier otra ruta queda cerrada.
+    match /{documento=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// =====================================================================
+//  MODO PRUEBA - descomenta SOLO esto y comenta todo lo de arriba
+//  si necesitas probar sin restricciones.
+// =====================================================================
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//     match /{documento=**} {
+//       allow read, write: if true;
+//     }
+//   }
+// }

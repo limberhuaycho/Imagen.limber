@@ -1,0 +1,92 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "//": "=== Ajuste global de la app ===",
+
+    "config": {
+      ".read": true,
+      ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+    },
+
+    "//": "=== Usuarios: cada quien ve y edita solo su ficha ===",
+
+    "usuarios": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email == 'limberhuaychoquispe81')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email == 'limberhuaychoquispe81')",
+        ".validate": "newData.hasChildren(['numero']) || !newData.exists()",
+
+        "numero": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "nombre": { ".validate": "newData.isString() && newData.val().length <= 60" },
+        "email": { ".validate": "newData.isString() || !newData.exists()" },
+        "fotoUrl": { ".validate": "newData.isString() || !newData.exists()" },
+
+        "//": "estos dos campos solo los toca el admin",
+        "verificadoPorEmpresa": {
+          ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+        },
+        "esEmpresa": {
+          ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+        }
+      }
+    },
+
+    "//": "=== Presencia y tecleo en tiempo real ===",
+
+    "estadoChats": {
+      "$chatId": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          "enLineo": { ".validate": "newData.isBoolean()" },
+          "escribiendo": { ".validate": "newData.isBoolean()" },
+          "ultimoVisto": { ".validate": "newData.isNumber()" }
+        }
+      }
+    },
+
+    "//": "=== Mensajes: puente de paso, se limpian a los 7 dias ===",
+
+    "mensajes": {
+      "$chatId": {
+        ".read": "auth != null",
+        "$mensajeId": {
+          ".write": "auth != null && (!data.exists() && newData.child('autor').val() === auth.uid)",
+          ".validate": "newData.hasChildren(['texto', 'autor', 'creado', 'expira'])",
+          "autor": { ".validate": "newData.isString()" },
+          "texto": { ".validate": "newData.isString() && newData.val().length > 0" },
+          "creado": { ".validate": "newData.isNumber()" },
+          "expira": { ".validate": "newData.isNumber() && newData.val() > newData.parent().child('creado').val()" },
+          "tipo": { ".validate": "newData.isString()" },
+          "urlImagen": { ".validate": "newData.isString() || !newData.exists()" },
+          "leido": {
+            ".write": "auth != null && newData.child('leidoPor').val() != null",
+            ".validate": "newData.isBoolean() || !newData.exists()"
+          },
+          "leidoPor": { ".validate": "newData.isString() || !newData.exists()" }
+        }
+      }
+    },
+
+    "//": "=== Codigos de verificacion: solo el administrador ===",
+
+    "codigos": {
+      ".read": "auth != null && auth.token.email == 'limberhuaychoquispe81'",
+      ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+    },
+
+    "//": "=== Numeros que la empresa puede verificar ===",
+
+    "numeros": {
+      ".read": "auth != null",
+      "$numero": {
+        ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'",
+        "verificado": { ".validate": "newData.isBoolean()" },
+        "nombre": { ".validate": "newData.isString() || !newData.exists()" },
+        "nota": { ".validate": "newData.isString() || !newData.exists()" }
+      }
+    }
+  }
+}

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin · Appv2</title>
+<style>
+  :root{
+    --verde:#00A884; --verde-osc:#008069; --fondo:#ECE5DD;
+    --barra:#fff; --texto:#111B21; --gris:#667781;
+    --borde:rgba(0,0,0,.08); --peligro:#D32F2F;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--fondo); color:var(--texto);
+    font-size:var(--base,18px);
+  }
+  header{
+    background:var(--verde); color:#fff; padding:16px 20px;
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  header h1{font-size:1.3rem;flex:1}
+  .badge{
+    background:rgba(255,255,255,.22); padding:5px 12px;
+    border-radius:999px; font-size:.8rem; font-weight:600;
+  }
+  main{max-width:1080px;margin:0 auto;padding:20px}
+  .card{
+    background:var(--barra); border-radius:12px; padding:18px;
+    margin-bottom:18px; box-shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  .card h2{font-size:1.05rem;margin-bottom:14px}
+  label{display:block;font-weight:600;margin-bottom:6px}
+  input,select{
+    width:100%; padding:12px; border:1px solid var(--borde);
+    border-radius:8px; font-size:1rem; font-family:inherit;
+    background:#fff; color:var(--texto);
+  }
+  input:focus,select:focus{outline:2px solid var(--verde)}
+  .fila{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+  .fila>*{flex:1;min-width:170px}
+  .fila .campo{margin-bottom:10px}
+  button{
+    background:var(--verde); color:#fff; border:0; padding:13px 20px;
+    border-radius:8px; font-size:1rem; font-weight:600;
+    font-family:inherit; cursor:pointer;
+  }
+  button:hover{background:var(--verde-osc)}
+  button.sec{background:#fff;color:var(--verde);border:2px solid var(--verde)}
+  button.peligro{background:var(--peligro)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:11px 8px;text-align:left;border-bottom:1px solid var(--borde);vertical-align:middle}
+  th{font-size:.85rem;color:var(--gris);text-transform:uppercase;letter-spacing:.04em}
+  .codigo{
+    font-family:ui-monospace,Consolas,monospace; font-size:1.5rem;
+    font-weight:700; letter-spacing:.22em; color:var(--verde-osc);
+  }
+  .chip{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.78rem;font-weight:600}
+  .chip.ok{background:#DCFCE7;color:#166534}
+  .chip.no{background:#FEE2E2;color:#991B1B}
+  .chip.pend{background:#FEF3C7;color:#92400E}
+  .oculto{display:none}
+  #login{max-width:420px;margin:60px auto}
+  .aviso{background:#FEF3C7;color:#92400E;padding:12px 14px;border-radius:8px;margin-bottom:16px;font-size:.88rem}
+  .info{font-size:.85rem;color:var(--gris);margin-top:8px}
+  .acciones{display:flex;gap:8px;flex-wrap:wrap}
+  .vacio{text-align:center;color:var(--gris);padding:26px}
+  .barra-filtros{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .barra-filtros button.sec.on{background:var(--verde);color:#fff;border-color:var(--verde)}
+</style>
+</head>
+<body>
+<!-- ================= LOGIN ================= -->
+<section id="login" class="card">
+  <h2>Acceso del administrador</h2>
+  <div class="aviso">
+    Solo la cuenta <strong>limberhuaychoquispe81</strong> puede entrar a este panel.
+  </div>
+  <div style="margin-bottom:12px">
+    <label for="correo">Correo</label>
+    <input id="correo" type="email" placeholder="limberhuaychoquispe81" autocomplete="username">
+  </div>
+  <div style="margin-bottom:16px">
+    <label for="clave">Contrasena</label>
+    <input id="clave" type="password" placeholder="Tu contrasena" autocomplete="current-password">
+  </div>
+  <button style="width:100%" id="btnEntrar">Entrar</button>
+  <p class="info" id="msgLogin"></p>
+</section>
+
+<!-- ================= PANEL ================= -->
+<section id="panel" class="oculto">
+  <header>
+    <h1>Panel de administracion · Appv2</h1>
+    <span class="badge" id="miCorreo"></span>
+    <button class="sec" id="btnTamano">Letra: normal</button>
+    <button class="sec" id="btnSalir">Salir</button>
+  </header>
+
+  <main>
+    <div class="aviso" id="avisoStorage" style="display:none"></div>
+
+    <div class="card">
+      <h2>1. Generar codigo de 6 digitos</h2>
+      <div class="fila">
+        <div class="campo">
+          <label for="numero">Numero de telefono</label>
+          <input id="numero" placeholder="51987654321" inputmode="numeric">
+        </div>
+        <div class="campo">
+          <label for="nombreNum">Nombre del contacto</label>
+          <input id="nombreNum" placeholder="Opcional">
+        </div>
+      </div>
+      <div class="acciones">
+        <button id="btnGenerar">Generar codigo</button>
+      </div>
+      <div id="resultado" style="margin-top:16px"></div>
+      <p class="info">
+        Envia el codigo por correo o WhatsApp al numero de arriba.
+        Caduca en 10 minutos y se puede usar una sola vez.
+      </p>
+    </div>
+    <div class="card">
+      <h2>2. Solicitudes pendientes</h2>
+      <div id="tablaSolicitudes"></div>
+    </div>
+
+    <div class="card">
+      <h2>3. Verificacion de la empresa</h2>
+      <p class="info" style="margin-bottom:12px">
+        Marca que numeros autoriza tu empresa. Solo estos pueden usar la
+        app como cuenta verificada.
+      </p>
+      <div class="fila">
+        <div class="campo">
+          <label for="numVerif">Numero a verificar</label>
+          <input id="numVerif" placeholder="51987654321" inputmode="numeric">
+        </div>
+        <div class="campo">
+          <label for="notaVerif">Nota interna</label>
+          <input id="notaVerif" placeholder="Ej: cliente de la tienda">
+        </div>
+      </div>
+      <div class="acciones" style="margin-bottom:16px">
+        <button id="btnVerificar">Marcar verificado</button>
+        <button class="sec" id="btnQuitarVerif">Quitar verificacion</button>
+      </div>
+      <div id="tablaVerificados"></div>
+    </div>
+
+    <div class="card">
+      <h2>4. Mensajes del puente (se borran a los 7 dias)</h2>
+      <div class="barra-filtros">
+        <button class="sec" data-filtro="pendientes">Pendientes</button>
+        <button class="sec" data-filtro="entregados">Entregados</button>
+        <button class="sec" data-filtro="vencidos">Vencidos</button>
+      </div>
+      <div id="tablaMensajes"></div>
+      <p class="info">
+        Firebase es solo el puente. Cuando el receptor lo lee, el mensaje
+        se elimina de aqui y queda guardado en el telefono.
+      </p>
+    </div>
+  </main>
+</section>
+
+<script type="module" src="admin.js"></script>
+<!-- CUERPO_PANEL -->
+</body>
+</html>
