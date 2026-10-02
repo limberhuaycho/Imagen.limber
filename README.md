@@ -123,14 +123,22 @@ firebase deploy --only firestore:rules,database,storage
 
 ### Crear la cuenta de administrador
 
-En la consola de Firebase → **Authentication → Sign-in method** → activa
-**Correo/Contraseña**. Luego crea el usuario:
+No hace falta crear ninguna cuenta a mano.
 
-- Correo: **limberhuaychoquispe81**
-- (la contraseña la eliges tú)
+1. En la consola de Firebase → **Authentication → Sign-in method**,
+   activa el proveedor **Google**. Eso es todo.
+2. Abre el panel y pulsa **Entrar con Google**.
+3. Solo el correo **`limberhuaychoquispe81`** deja pasar. Cualquier otra
+   cuenta entra en Firebase pero el panel se le cierra al instante
+   mostrándole un aviso.
 
-Ese es el único correo que abre el panel. Cualquier otro que entre ve
-un aviso y se cierra la sesión.
+No se usa correo con contraseña en ningún momento, así que no hace falta
+activar ese proveedor ni inventar una contraseña.
+
+> Las reglas de Firebase siguen funcionando igual: al entrar con Google,
+> el token ya trae el correo, así que
+> `request.auth.token.email == 'limberhuaychoquispe81'` continúa
+> protegiendo los datos. No hay que cambiar ningún archivo de reglas.
 
 ### Publicar el panel
 

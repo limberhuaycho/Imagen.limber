@@ -5,7 +5,8 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import {
-  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+  getAuth, GoogleAuthProvider, signInWithPopup,
+  onAuthStateChanged, signOut
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import {
   getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc,
@@ -94,24 +95,39 @@ document.getElementById("btnTamano").onclick = () => {
 };
 
 // ---------------------------------------------------------------------
-// Login
+// Login con Google
 // ---------------------------------------------------------------------
 
-document.getElementById("btnEntrar").onclick = async () => {
-  const correo = document.getElementById("correo").value.trim();
-  const clave = document.getElementById("clave").value;
-  if (!correo || !clave) return aviso("Completa correo y contrasena.", true);
+const proveedorGoogle = new GoogleAuthProvider();
+// Pide solo el correo, que es lo unico que se compara.
+proveedorGoogle.addScope("email");
+
+/** Normaliza el correo: sin mayusculas y sin espacios. */
+function normalizarCorreo(correo) {
+  return (correo || "").trim().toLowerCase();
+}
+
+document.getElementById("btnGoogle").onclick = async () => {
+  const boton = document.getElementById("btnGoogle");
+  boton.disabled = true;
+  aviso("Abriendo el inicio de sesion de Google...");
 
   try {
-    const cred = await signInWithEmailAndPassword(auth, correo, clave);
-    if (cred.user.email !== ADMIN) {
+    const cred = await signInWithPopup(auth, proveedorGoogle);
+
+    if (normalizarCorreo(cred.user.email) !== normalizarCorreo(ADMIN)) {
       await signOut(auth);
-      return aviso("Esa cuenta no es administradora.", true);
+      aviso("Esa cuenta no es administradora. Solo entra "
+            + ADMIN + ".", true);
+      return;
     }
-    aviso("Entrando...");
+
+    aviso("Sesion iniciada.");
     abrirPanel(cred.user.email);
   } catch (e) {
     aviso("No se pudo entrar: " + e.message, true);
+  } finally {
+    boton.disabled = false;
   }
 };
 
@@ -129,10 +145,16 @@ onAuthStateChanged(auth, user => {
   if (!user) {
     document.getElementById("panel").classList.add("oculto");
     document.getElementById("login").classList.remove("oculto");
-  } else if (user.email === ADMIN) {
+    return;
+  }
+  if (normalizarCorreo(user.email) === normalizarCorreo(ADMIN)) {
     abrirPanel(user.email);
   } else {
-    signOut(auth);
+    // Entro con Google pero con otra cuenta: se cierra al instante.
+    signOut(auth).then(() => {
+      aviso("Esa cuenta no es administradora. Solo entra "
+            + ADMIN + ".", true);
+    });
   }
 });
 // ---------------------------------------------------------------------
