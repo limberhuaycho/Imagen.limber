@@ -1,6 +1,6 @@
 // =====================================================================
 //  Appv2 - Panel de administracion
-//  Solo entra la cuenta limberhuaychoquispe81.
+//  Solo entra la cuenta limberhuaychoquispe81@gmail.com.
 // =====================================================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
@@ -30,7 +30,7 @@ const CONFIG = {
 
 // Correo del unico administrador. Cualquier otro cuenta entra pero
 // se le cierra el panel de inmediato.
-const ADMIN = "limberhuaychoquispe81";
+const ADMIN = "limberhuaychoquispe81@gmail.com";
 
 const app = initializeApp(CONFIG);
 const auth = getAuth(app);

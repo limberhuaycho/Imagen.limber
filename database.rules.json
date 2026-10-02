@@ -7,15 +7,15 @@
 
     "config": {
       ".read": true,
-      ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+      ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81@gmail.com'"
     },
 
     "//": "=== Usuarios: cada quien ve y edita solo su ficha ===",
 
     "usuarios": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || auth.token.email == 'limberhuaychoquispe81')",
-        ".write": "auth != null && (auth.uid === $uid || auth.token.email == 'limberhuaychoquispe81')",
+        ".read": "auth != null && (auth.uid === $uid || auth.token.email == 'limberhuaychoquispe81@gmail.com')",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.email == 'limberhuaychoquispe81@gmail.com')",
         ".validate": "newData.hasChildren(['numero']) || !newData.exists()",
 
         "numero": { ".validate": "newData.isString() && newData.val().length <= 20" },
@@ -25,10 +25,10 @@
 
         "//": "estos dos campos solo los toca el admin",
         "verificadoPorEmpresa": {
-          ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+          ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81@gmail.com'"
         },
         "esEmpresa": {
-          ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+          ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81@gmail.com'"
         }
       }
     },
@@ -73,8 +73,8 @@
     "//": "=== Codigos de verificacion: solo el administrador ===",
 
     "codigos": {
-      ".read": "auth != null && auth.token.email == 'limberhuaychoquispe81'",
-      ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'"
+      ".read": "auth != null && auth.token.email == 'limberhuaychoquispe81@gmail.com'",
+      ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81@gmail.com'"
     },
 
     "//": "=== Numeros que la empresa puede verificar ===",
@@ -82,7 +82,7 @@
     "numeros": {
       ".read": "auth != null",
       "$numero": {
-        ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81'",
+        ".write": "auth != null && auth.token.email == 'limberhuaychoquispe81@gmail.com'",
         "verificado": { ".validate": "newData.isBoolean()" },
         "nombre": { ".validate": "newData.isString() || !newData.exists()" },
         "nota": { ".validate": "newData.isString() || !newData.exists()" }

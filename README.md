@@ -25,7 +25,7 @@ Proyecto de clase. App Android (Kotlin + Compose) + panel web de administración
    solo en el teléfono de cada quien.
 5. **Imágenes** por medio de Cloud Storage.
 6. **Modo letra grande** en los ajustes.
-7. **Panel web** donde solo entra `limberhuaychoquispe81` para generar los
+7. **Panel web** donde solo entra `limberhuaychoquispe81@gmail.com` para generar los
    códigos de verificación y decidir qué números están autorizados por la
    empresa.
 
@@ -128,7 +128,7 @@ No hace falta crear ninguna cuenta a mano.
 1. En la consola de Firebase → **Authentication → Sign-in method**,
    activa el proveedor **Google**. Eso es todo.
 2. Abre el panel y pulsa **Entrar con Google**.
-3. Solo el correo **`limberhuaychoquispe81`** deja pasar. Cualquier otra
+3. Solo el correo **`limberhuaychoquispe81@gmail.com`** deja pasar. Cualquier otra
    cuenta entra en Firebase pero el panel se le cierra al instante
    mostrándole un aviso.
 
@@ -137,7 +137,7 @@ activar ese proveedor ni inventar una contraseña.
 
 > Las reglas de Firebase siguen funcionando igual: al entrar con Google,
 > el token ya trae el correo, así que
-> `request.auth.token.email == 'limberhuaychoquispe81'` continúa
+> `request.auth.token.email == 'limberhuaychoquispe81@gmail.com'` continúa
 > protegiendo los datos. No hay que cambiar ningún archivo de reglas.
 
 ### Publicar el panel

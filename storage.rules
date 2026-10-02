@@ -10,7 +10,7 @@ service firebase.storage {
 
     function esAdmin() {
       return request.auth != null
-        && request.auth.token.email == 'limberhuaychoquispe81';
+        && request.auth.token.email == 'limberhuaychoquispe81@gmail.com';
     }
 
     function dueno(uid) {

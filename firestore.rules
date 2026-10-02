@@ -16,7 +16,7 @@ service cloud.firestore {
     // Correo del unico administrador.
     function esAdmin() {
       return request.auth != null
-        && request.auth.token.email == 'limberhuaychoquispe81';
+        && request.auth.token.email == 'limberhuaychoquispe81@gmail.com';
     }
 
     // El usuario autenticado es dueño de este documento de usuario.
