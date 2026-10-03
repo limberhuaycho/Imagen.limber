@@ -36,7 +36,7 @@
         ".read": "auth != null",
         "$mensajeId": {
           ".write": "auth != null && (!data.exists() && newData.child('autor').val() === auth.uid)",
-          "texto": { ".validate": "newData.isString() && newData.val().length > 0" },
+          "texto": { ".validate": "newData.isString()" },
           "autor": { ".validate": "newData.isString()" },
           "creado": { ".validate": "newData.isNumber()" },
           "expira": { ".validate": "newData.isNumber()" },

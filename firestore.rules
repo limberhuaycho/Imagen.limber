@@ -86,23 +86,64 @@ service cloud.firestore {
         && miVerificacion().data.numero == numero
       );
 
-      // El admin puede corregirlo o borrarlo. El usuario, solo sobre su
-      // propio codigo (lo que prueba el uid guardado al crearlo):
+      // El admin puede corregirlo o borrarlo. El usuario solo sobre el
+      //  documento del numero que tiene reclamado en su ficha de
+      //  verificacion. Se permiten dos cosas y ninguna mas:
       //  - marcarlo usado tras verificarlo;
-      //  - pedir otro codigo, y solo si le quedan intentos.
+      //  - regenerarlo: codigo nuevo de 6 digitos, usado=false,
+      //    intentos=0, creado y expira de ahora.
+      //
+      //  OJO con el uid: antes se pedia resource.data.uid == miUid().
+      //  Eso rompia el caso normal de "el numero ya tiene codigo", porque
+      //  al renovar la sesion anonima el uid cambia y el set() sobre un
+      //  documento existente es un update, no un create: la escritura
+      //  se rechazaba con PERMISSION_DENIED y el usuario veia "No se
+      //  pudo generar el codigo". La pertenencia se comprueba con la
+      //  ficha de verificacion, que ya ampara uid -> numero, asi que no
+      //  se abre la coleccion: solo se toca codigos/{numero} y solo si
+      //  ese numero es el que esta sesion ha reclamado.
       allow update: if esAdmin() || (
         request.auth != null
-        && resource.data.uid == miUid()
         && miVerificacion().data.numero == numero
         && (
-          request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['usado'])
-          || (
+          // Marcarlo usado: una sola transicion, de false a true.
+          (
             request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['codigo', 'expira', 'creado', 'usado', 'intentos'])
-            && resource.data.intentos < maxIntentos()
+                 .hasOnly(['usado'])
+            && request.resource.data.usado == true
+            && resource.data.usado == false
+          )
+          || (
+            // Regenerarlo: solo los campos del codigo, siempre con la
+            // misma forma y siempre empezando por un codigo sin usar.
+            request.resource.data.diff(resource.data).affectedKeys()
+                 .hasAll(['codigo', 'expira', 'usado', 'creado'])
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly([
+                   'numero', 'codigo', 'uid', 'expira', 'intentos',
+                   'usado', 'creado'
+                 ])
+            // No se inventa otro documento ni otro numero.
+            && request.resource.data.numero == numero
+            && request.resource.data.keys().hasAll([
+                 'numero', 'codigo', 'uid', 'expira', 'intentos',
+                 'usado', 'creado'
+               ])
             && request.resource.data.codigo is string
             && request.resource.data.codigo.size() == 6
+            && request.resource.data.codigo != resource.data.codigo
+            && request.resource.data.usado == false
+            && request.resource.data.intentos == 0
+            // "creado" lo pone el servidor (serverTimestamp), asi que da
+            // igual que el reloj del telefono vaya atras o adelante.
+            && request.resource.data.creado == request.time
+            // La caducidad se comprueba con margen: se acepta un reloj
+            // desincronizado, pero no una fecha absurda. El uso del
+            // codigo sigue exigiendo expira > request.time en /intentos.
+            && request.resource.data.expira is timestamp
+            && request.resource.data.expira > request.time
+            && request.resource.data.expira
+                 <= request.time + duration.value(1, 'd')
           )
         )
       );
@@ -121,12 +162,17 @@ service cloud.firestore {
 
       allow create: if miUid() == uid
         && request.resource.data.keys()
-             .hasOnly(['numero', 'intentos', 'creado'])
+             .hasOnly(['numero', 'intentos', 'creado', 'expira'])
         && request.resource.data.numero is string
         && request.resource.data.numero.size() >= 8;
 
       // El contador SOLO puede subir. Rebajarlo solo se permite al pedir
       // otro codigo, y con un minuto de espera entre reenvios.
+      //
+      // "expira" es la copia de la caducidad del codigo que pidio esta
+      // sesion. Se permite solo cuando el contador vuelve a cero, o sea
+      // en el mismo movimiento que se regenera el codigo: asi no se
+      // puede tocar nada mas de esta ficha.
       allow update: if esAdmin() || (
         miUid() == uid
         && (
@@ -142,6 +188,20 @@ service cloud.firestore {
             // Si nunca hubo reenvio, la espera se cuenta desde que se
             // empezo esta verificacion: si no, el primer reenvio
             // quedaria bloqueado para siempre.
+            && request.time > resource.data.get('reenviado', resource.data.creado)
+                  + duration.value(esperaReenvioMinutos(), 'm')
+          )
+          || (
+            // Al regenerar el codigo se guarda tambien su caducidad.
+            // Solo tiene que ser una fecha futura: el valor real lo
+            // decide la app y no se usa para autorizar nada.
+            request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['intentos', 'reenviado', 'expira'])
+            && request.resource.data.intentos == 0
+            && request.resource.data.expira is timestamp
+            && request.resource.data.expira > request.time
+            && request.resource.data.expira
+                 <= request.time + duration.value(1, 'd')
             && request.time > resource.data.get('reenviado', resource.data.creado)
                   + duration.value(esperaReenvioMinutos(), 'm')
           )
@@ -190,9 +250,75 @@ service cloud.firestore {
 
     // =================================================================
     // /usuarios/{uid}
+    // El perfil de la persona: lo que escribe "Editar perfil" y ve el
+    // resto. Cada quien escribe solo el suyo.
+    //
+    // OJO: "verificado" y "esEmpresa" NO pueden escribirse desde la app.
+    // Ahora estan en la lista de campos permitidos porque el alta inicial
+    // los escribe la propia sesion, pero no se usan para autorizar nada:
+    // lo que decide si una cuenta es de empresa es /numeros/{numero}, y
+    // ahi "verificado" es solo del administrador. Aun asi se dejan fuera
+    // los campos de administracion para que un cambio futuro de reglas no
+    // los dejara pasar sin querer.
     // =================================================================
     match /usuarios/{uid} {
-      allow read, write: if esAdmin() || miUid() == uid;
+
+      allow read: if esAdmin() || miUid() == uid;
+
+      allow create: if miUid() == uid
+        && request.resource.data.keys().hasOnly([
+             'numero', 'nombre', 'fotoUrl', 'esEmpresa', 'usuario',
+             'estado', 'empresa', 'actividad', 'direccion', 'correo',
+             'telefono', 'sitioWeb', 'instagram', 'facebook', 'actualizado'
+           ]);
+
+      allow update: if esAdmin() || (
+        miUid() == uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly([
+               'numero', 'nombre', 'fotoUrl', 'esEmpresa', 'usuario',
+               'estado', 'empresa', 'actividad', 'direccion', 'correo',
+               'telefono', 'sitioWeb', 'instagram', 'facebook', 'actualizado'
+             ])
+      );
+
+      allow delete: if esAdmin();
+    }
+
+    // =================================================================
+    // /dispositivos/{idDispositivo}
+    // Un documento por telefono real. La app escribe aqui los datos que
+    // salen de android.os.Build al entrar: marca, modelo, version de
+    // Android, pantalla, red, pais, fecha de instalacion, etc.
+    //
+    // El identificador es un hash del ANDROID_ID del propio telefono, asi
+    // que reinstalar la app no crea un equipo nuevo. Quien escribe es
+    // siempre la propia sesion: nadie puede registrar un dispositivo en
+    // nombre de otro uid ni cambiar de dueno un documento existente.
+    // =================================================================
+    match /dispositivos/{idDispositivo} {
+
+      allow read: if esAdmin() || (
+        request.auth != null && resource.data.uid == request.auth.uid
+      );
+
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasAll([
+             'uid', 'numero', 'idDispositivo', 'androidId', 'marca',
+             'modelo', 'android', 'sdk', 'activo', 'ultimaConexion'
+           ]);
+
+      // Al volver a entrar se actualiza todo menos "uid", que es la
+      // pertenencia del documento: si se pudiera cambiar, un usuario
+      // podria robarle el equipo a otra cuenta escribiendolo.
+      allow update: if esAdmin() || (
+        request.auth != null
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == resource.data.uid
+      );
+
+      allow delete: if esAdmin();
     }
 
     // =================================================================

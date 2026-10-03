@@ -29,6 +29,16 @@ Proyecto de clase. App Android (Kotlin + Compose) + panel web de administración
 7. **Panel web** donde solo entra `limberhuaychoquispe81@gmail.com` para generar los
    códigos de verificación y decidir qué números están autorizados por la
    empresa.
+8. **Datos reales del dispositivo**: marca, modelo, versión de Android,
+   pantalla, ABI, red, país, zona horaria y fecha de instalación. Se leen
+   de `android.os.Build` y del sistema, no se inventan, y se guardan en
+   `/dispositivos/{idDispositivo}`.
+9. **Permiso de contactos**: la agenda del teléfono se lee con
+   `READ_CONTACTS` para poder escribir a quien ya tienes guardado. Los
+   contactos **nunca** se suben a Firebase.
+10. **Perfil guardado en Firebase**: usuario, descripción, empresa,
+    actividad, dirección, correo, teléfono, web, Instagram y Facebook se
+    escriben en `/usuarios/{uid}` desde "Editar perfil".
 
 ---
 
@@ -74,7 +84,8 @@ manda el código a mano desde el panel: así no se gasta nada.
 | `numeros/{numero}` | Si el número existe, y si la empresa lo verificó |
 | `codigos/{numero}` | El código de 6 dígitos, con vencimiento y usos |
 | `solicitudes/{id}` | Peticiones de código que llegan desde la app |
-| `usuarios/{uid}` | Perfil de cada persona |
+| `usuarios/{uid}` | Perfil de cada persona: nombre, usuario, empresa, contacto y redes |
+| `dispositivos/{id}` | Datos reales del teléfono: modelo, Android, pantalla, red, última conexión |
 | `mensajes/{chatId}/mensaje/{id}` | Mensajes del puente, con `expira` a 7 días |
 
 ### Realtime Database

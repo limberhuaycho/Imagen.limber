@@ -488,6 +488,122 @@ window.borrarMsg = async function (chatId, msgId) {
 };
 
 // ---------------------------------------------------------------------
+// 5. Dispositivos reales y perfiles guardados
+// ---------------------------------------------------------------------
+
+/**
+ * Tabla de /dispositivos: quien entro, desde que equipo y cuando fue la
+ * ultima vez. El boton de desvincular solo cambia "activo"; el registro se
+ * conserva para saber que ese equipo existio.
+ */
+async function cargarDispositivos() {
+  const cont = document.getElementById("tablaDispositivos");
+  if (!cont) return;
+  cont.innerHTML = '<div class="vacio">Cargando...</div>';
+
+  try {
+    const snap = await getDocs(collection(db, "dispositivos"));
+    const filas = [];
+
+    snap.forEach(s => {
+      const d = s.data();
+      const activo = d.activo !== false;
+      const titulo = [d.marca, d.modelo].filter(Boolean).join(" ") || "-";
+      const sistema = d.android ? "Android " + d.android : "-";
+
+      filas.push(`
+        <tr>
+          <td>+${escapeHtml(d.numero || "-")}</td>
+          <td>${escapeHtml(d.nombre || "-")}</td>
+          <td>${escapeHtml(titulo)}</td>
+          <td>${escapeHtml(sistema)}</td>
+          <td>${escapeHtml(d.pantalla || "-")}</td>
+          <td>${escapeHtml(d.red || "-")}</td>
+          <td>${escapeHtml(d.pais || "-")}</td>
+          <td>${escapeHtml(fechaBonita(d.ultimaConexion))}</td>
+          <td>${activo
+            ? '<span class="chip ok">activo</span>'
+            : '<span class="chip no">desvinculado</span>'}</td>
+          <td class="acciones">
+            ${activo
+              ? `<button class="peligro"
+                   onclick="desvincularDispositivo('${escapeHtml(s.id)}')">Desvincular</button>`
+              : ""}
+          </td>
+        </tr>`);
+    });
+
+    // Los mas recientes primero: es lo que se consulta normalmente.
+    filas.sort((a, b) => (b.includes("chip ok") ? 1 : -1));
+
+    cont.innerHTML = filas.length
+      ? `<table><thead><tr>
+          <th>Numero</th><th>Nombre</th><th>Equipo</th><th>Sistema</th>
+          <th>Pantalla</th><th>Red</th><th>Pais</th><th>Ultima conexion</th>
+          <th>Estado</th><th></th>
+         </tr></thead><tbody>${filas.join("")}</tbody></table>`
+      : '<div class="vacio">Todavia no hay dispositivos. Cuando alguien entre en la app, aparecera aqui.</div>';
+  } catch (e) {
+    cont.innerHTML = `<div class="vacio">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+window.desvincularDispositivo = async function (id) {
+  if (!confirm("Desvincular este equipo? Dejara de tener acceso a la cuenta.")) return;
+  await setDoc(doc(db, "dispositivos", id), { activo: false }, { merge: true });
+  cargarDispositivos();
+};
+
+/**
+ * Tabla de /usuarios: lo que cada persona escribio en "Editar perfil".
+ * Solo muestra campos, sin generar nada: aqui no se autoriza a nadie.
+ */
+async function cargarPerfiles() {
+  const cont = document.getElementById("tablaPerfiles");
+  if (!cont) return;
+  cont.innerHTML = '<div class="vacio">Cargando...</div>';
+
+  try {
+    const snap = await getDocs(collection(db, "usuarios"));
+    const filas = [];
+
+    snap.forEach(s => {
+      const d = s.data();
+      const usuario = d.usuario
+        ? `<a href="https://instagram.com/${escapeHtml(d.usuario)}"
+             target="_blank" rel="noopener">@${escapeHtml(d.usuario)}</a>`
+        : "-";
+
+      filas.push(`
+        <tr>
+          <td>+${escapeHtml(d.numero || "-")}</td>
+          <td>${escapeHtml(d.nombre || "-")}</td>
+          <td>${escapeHtml(d.empresa || "-")}</td>
+          <td>${escapeHtml(d.actividad || "-")}</td>
+          <td>${escapeHtml(d.direccion || "-")}</td>
+          <td>${escapeHtml(d.correo || "-")}</td>
+          <td>${usuario}</td>
+          <td>${escapeHtml(fechaBonita(d.actualizado))}</td>
+        </tr>`);
+    });
+
+    cont.innerHTML = filas.length
+      ? `<table><thead><tr>
+          <th>Numero</th><th>Nombre</th><th>Empresa</th><th>Actividad</th>
+          <th>Direccion</th><th>Correo</th><th>Instagram</th><th>Actualizado</th>
+         </tr></thead><tbody>${filas.join("")}</tbody></table>`
+      : '<div class="vacio">Todavia no hay perfiles guardados.</div>';
+  } catch (e) {
+    cont.innerHTML = `<div class="vacio">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+document.getElementById("btnActualizarDisp").onclick = () => {
+  cargarDispositivos();
+  cargarPerfiles();
+};
+
+// ---------------------------------------------------------------------
 // Arranque
 // ---------------------------------------------------------------------
 
@@ -496,6 +612,8 @@ function cargarTodo() {
   escucharSolicitudes();
   cargarVerificados();
   cargarMensajes();
+  cargarDispositivos();
+  cargarPerfiles();
 }
 
 // Restaura el tamano de letra elegido antes.
