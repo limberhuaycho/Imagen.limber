@@ -222,52 +222,67 @@ window.copiar = function (texto) {
 };
 
 // ---------------------------------------------------------------------
-// 2. Solicitudes pendientes
+// 2. Codigos que genero la app al escribir un numero
 // ---------------------------------------------------------------------
 
 async function cargarSolicitudes() {
   const cont = document.getElementById("tablaSolicitudes");
   try {
-    const snap = await getDocs(collection(db, "solicitudes"));
+    const snap = await getDocs(collection(db, "codigos"));
     const filas = [];
 
     snap.forEach(s => {
       const d = s.data();
-      if (d.estado === "atendido") return;
+      const num = d.numero || s.id;
+
+      // Caducado a los 10 minutos de generarse.
+      const expira = d.expira?.toMillis?.() ?? d.expira ?? 0;
+      const vencido = Date.now() > expira;
+      const usado = d.usado === true;
+
+      const estado = usado
+        ? '<span class="chip ok">usado</span>'
+        : (vencido
+          ? '<span class="chip no">caducado</span>'
+          : '<span class="chip pend">esperando</span>');
+
+      const quedan = vencido
+        ? "-"
+        : Math.max(0, Math.ceil((expira - Date.now()) / 60000)) + " min";
+
       filas.push(`
         <tr>
-          <td>+${escapeHtml(d.numero || "?")}</td>
-          <td>${escapeHtml(d.nombre || "-")}</td>
+          <td>+${escapeHtml(num)}</td>
+          <td class="codigo" style="font-size:1.25rem">${escapeHtml(d.codigo || "-")}</td>
           <td>${escapeHtml(fechaBonita(d.creado))}</td>
-          <td><span class="chip pend">pendiente</span></td>
+          <td>${quedan}</td>
+          <td>${estado}</td>
           <td>
             <div class="acciones">
-              <button class="sec" onclick="generarPara('${escapeHtml(d.numero || "")}','${escapeHtml(d.nombre || "")}')">Generar</button>
-              <button class="peligro" onclick="atender('${s.id}')">Descartar</button>
+              <button class="sec" onclick="copiar('${escapeHtml(d.codigo || "")}')">Copiar</button>
+              <button class="peligro" onclick="borrarCodigo('${escapeHtml(num)}')">Borrar</button>
             </div>
           </td>
         </tr>`);
     });
 
+    // Primero los que siguen esperando.
+    filas.sort((a, b) => (a.includes("esperando") ? -1 : 1));
+
     cont.innerHTML = filas.length
       ? `<table><thead><tr>
-          <th>Numero</th><th>Nombre</th><th>Fecha</th><th>Estado</th><th></th>
+          <th>Numero</th><th>Codigo</th><th>Creado</th><th>Vence</th><th>Estado</th><th></th>
          </tr></thead><tbody>${filas.join("")}</tbody></table>`
-      : '<div class="vacio">No hay solicitudes pendientes.</div>';
+      : '<div class="vacio">Todavia no hay codigos. Cuando alguien escriba su numero en la app, aparecera aqui.</div>';
   } catch (e) {
     cont.innerHTML = `<div class="vacio">No se pudieron leer: ${escapeHtml(e.message)}</div>`;
   }
 }
 
-window.generarPara = function (numero, nombre) {
-  document.getElementById("numero").value = numero;
-  document.getElementById("nombreNum").value = nombre;
-  document.getElementById("btnGenerar").click();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-};
-
-window.atender = async function (id) {
-  await setDoc(doc(db, "solicitudes", id), { estado: "atendido" }, { merge: true });
+/** Borra un codigo para que la app pueda generar otro. */
+window.borrarCodigo = async function (numero) {
+  if (!confirm("Borrar el codigo de +" + numero + "?")) return;
+  await deleteDoc(doc(db, "codigos", numero));
   cargarSolicitudes();
 };
 // ---------------------------------------------------------------------
