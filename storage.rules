@@ -43,6 +43,34 @@ service firebase.storage {
     }
 
     // ---------------------------------------------------------------
+    // /catalogo/{uid}/{archivo}
+    // Las fotos de los productos del catalogo de una empresa.
+    //
+    // Se pueden leer sin restricciones: el catalogo es publico, es como
+    // el escaparate de una tienda, y cualquiera autenticado tiene que
+    // poder ver que vende esa empresa antes de escribirle.
+    //
+    // Escribir es solo del dueno, y solo imagenes: el limite de 5 MB se
+    // aplica tambien aqui para que nadie suba un vídeo de un gigabyte a
+    // la carpeta del catalogo.
+    // ---------------------------------------------------------------
+    match /catalogo/{uid}/{archivo} {
+      allow read: if request.auth != null;
+      allow write: if dueno(uid) && imagenValida();
+      allow delete: if dueno(uid) || esAdmin();
+    }
+
+    // ---------------------------------------------------------------
+    // /grupos/{grupoId}/{uid}/{archivo}
+    // La foto de un grupo.
+    // ---------------------------------------------------------------
+    match /grupos/{grupoId}/{uid}/{archivo} {
+      allow read: if request.auth != null;
+      allow write: if dueno(uid) && imagenValida();
+      allow delete: if dueno(uid) || esAdmin();
+    }
+
+    // ---------------------------------------------------------------
     // /admin/...
     // Contenido del panel de administracion.
     // ---------------------------------------------------------------

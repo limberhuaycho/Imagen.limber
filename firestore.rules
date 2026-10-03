@@ -12,6 +12,27 @@ service cloud.firestore {
       return request.auth != null ? request.auth.uid : '';
     }
 
+    // Membresia por RUTA, no por un campo.
+    //
+    // Existe un documento /conversaciones/{id}/miembros/{uid} por cada
+    // participante. Es lo que permite que las consultas funcionen: las
+    // reglas pueden comprobar la pertenencia con exists() sobre una ruta
+    // que sale del propio path de la regla, y eso Firestore SI lo sabe
+    // evaluar para una lista. Con un campo "participantes" dentro del
+    // documento habria que hacer get() del mismo documento que se esta
+    // comprobando, y en una consulta eso no se puede resolver: la lista
+    // entera fallaria con "missing or insufficient permissions".
+    function soyParticipante(conversacionId) {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/conversaciones/$(conversacionId)/miembros/$(miUid()));
+    }
+
+    function soyAdminDe(conversacionId) {
+      return soyParticipante(conversacionId)
+        && miUid() in get(/databases/$(database)/documents/conversaciones/$(conversacionId))
+             .data.administradores.split(',');
+    }
+
     // Numero completo de la empresa principal: 51 + 73265343.
     function esMiEmpresa(numero) {
       return numero == '59173265343';
@@ -52,7 +73,7 @@ service cloud.firestore {
       allow update: if esAdmin() || (
         request.auth != null
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['fotoUrl', 'nombre', 'actualizado', 'disponible'])
+             .hasOnly(['fotoUrl', 'nombre', 'actualizado', 'disponible', 'esEmpresa'])
         && (resource.data.uid == miUid() || resource.data.uid == null)
       );
 
@@ -185,11 +206,14 @@ service cloud.firestore {
             request.resource.data.diff(resource.data).affectedKeys()
                  .hasOnly(['intentos', 'reenviado'])
             && request.resource.data.intentos == 0
-            // Si nunca hubo reenvio, la espera se cuenta desde que se
-            // empezo esta verificacion: si no, el primer reenvio
-            // quedaria bloqueado para siempre.
-            && request.time > resource.data.get('reenviado', resource.data.creado)
-                  + duration.value(esperaReenvioMinutos(), 'm')
+            // Mismo criterio que mas abajo: el primer codigo de la sesion
+            // no espera, los siguientes si. Ver la nota larga del bloque
+            // de ['intentos','reenviado','expira'].
+            && (
+              !('reenviado' in resource.data)
+              || request.time > resource.data.reenviado
+                    + duration.value(esperaReenvioMinutos(), 'm')
+            )
           )
           || (
             // Al regenerar el codigo se guarda tambien su caducidad.
@@ -202,8 +226,24 @@ service cloud.firestore {
             && request.resource.data.expira > request.time
             && request.resource.data.expira
                  <= request.time + duration.value(1, 'd')
-            && request.time > resource.data.get('reenviado', resource.data.creado)
-                  + duration.value(esperaReenvioMinutos(), 'm')
+            // AQUI ESTA EL ARREGLO DEL BUG "No se pudo generar el codigo".
+            //
+            // Antes la espera se media siempre desde "creado", asi que el
+            // PRIMER codigo de una sesion recien abierta fallaba siempre:
+            // la app acababa de crear la ficha con creado=ahora y, un
+            // instante despues, la regla exigia que hubiera pasado un
+            // minuto entero. El usuario veia "No se pudo generar el
+            // codigo" sin haber hecho nada mal.
+            //
+            // Ahora la espera solo cuenta cuando YA hubo un reenvio
+            // anterior ("reenviado" existe). El primer codigo es libre,
+            // y los siguientes siguen respetando el minuto de descanso
+            // para que nadie pueda machacar codigos/{numero} sin parar.
+            && (
+              !('reenviado' in resource.data)
+              || request.time > resource.data.reenviado
+                    + duration.value(esperaReenvioMinutos(), 'm')
+            )
           )
           || (
             // Cambiar de numero dentro de la misma sesion. No reinicia
@@ -281,7 +321,6 @@ service cloud.firestore {
                'telefono', 'sitioWeb', 'instagram', 'facebook', 'actualizado'
              ])
       );
-
       allow delete: if esAdmin();
     }
 
@@ -322,20 +361,267 @@ service cloud.firestore {
     }
 
     // =================================================================
+    // /conversaciones/{conversacionId}
+    // Las directas y los grupos.
+    //
+    // Solo se ve una conversacion si se es parte de ella. Antes esta regla
+    // decia "allow read: if request.auth != null", o sea que CUALQUIER
+    // cuenta autenticada (y la sesion es anonima, asi que cualquiera que
+    // instale la app) podia abrir la conversacion de otra persona y leer
+    // todos sus mensajes. Aqui se cierra.
+    // =================================================================
+    match /conversaciones/{conversacionId} {
+
+      allow read: if esAdmin() || soyParticipante(conversacionId);
+
+      // ---------------------------------------------------------------
+      // /conversaciones/{id}/miembros/{uid}
+      //
+      // Un documento por participante. Es el que hace posible que las
+      // consultas ("dame mis conversaciones") funcionen sin abrir un
+      // holes de seguridad: la pertenencia esta en la RUTA del documento,
+      // y las reglas pueden comprobarla sin leer el documento entero.
+      //
+      // El campo "participantes" del documento padre sigue guardandose
+      // porque lo necesita la app para pintar el grupo, pero ya no decide
+      // el acceso: eso lo hace esta subcoleccion.
+      // ---------------------------------------------------------------
+      match /miembros/{uid} {
+        allow read: if esAdmin() || miUid() == uid;
+
+        // Quien puede crear la conversacion da de alta a los miembros
+        // iniciales. Despues, anadir o quitar gente pasa por la app, que
+        // comprueba que quien llama es administrador antes de escribir.
+        //
+        // La comprobacion es que el uid siga estando en la lista del
+        // documento padre: asi nadie puede colarse en la subcoleccion
+        // "miembros" de una conversacion ajena declarandose a si mismo
+        // participante.
+        allow create: if miUid() == uid && (
+          esAdmin()
+          || soyAdminDe(conversacionId)
+          || uid in get(/databases/$(database)/documents/conversaciones/$(conversacionId))
+                  .data.participantes.split(',')
+        );
+
+        allow update: if esAdmin() || miUid() == uid;
+
+        allow delete: if esAdmin() || soyAdminDe(conversacionId);
+      }
+
+      // Crear: se exige que uno mismo este en la lista y que los campos
+      // tengan la forma esperada. Nadie crea una conversacion en la que no
+      // participa.
+      allow create: if request.auth != null
+        && miUid() in request.resource.data.participantes.split(',')
+        && request.resource.data.keys().hasAll([
+             'participantes', 'tipo', 'nombre', 'creado'
+           ])
+        && request.resource.data.keys().hasOnly([
+             'participantes', 'tipo', 'nombre', 'descripcion', 'fotoUrl',
+             'otroNumero', 'creado', 'actualizado', 'administradores',
+             'ultimoMensaje', 'ultimoMensajeAutor', 'ultimoMensajeHora'
+           ])
+        && request.resource.data.tipo in ['directa', 'grupo']
+        && request.resource.data.participantes.size() <= 256;
+
+      // Editar: un participante puede cambiar el nombre y la descripcion
+      // de un grupo, pero NO la lista de participantes ni los
+      // administradores con un update normal. Meter a alguien en un grupo
+      // (o quitarlo) pasa por las funciones de la app, que vuelven a
+      // comprobar que quien llama es administrador. Si se permitiera aqui,
+      // cualquier miembro podria ascenderse a administrador escribiendo el
+      // documento entero.
+      allow update: if esAdmin() || (
+        soyParticipante(conversacionId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly([
+               'nombre', 'descripcion', 'fotoUrl', 'ultimoMensaje',
+               'ultimoMensajeAutor', 'ultimoMensajeHora', 'actualizado'
+             ])
+        // Anadir o quitar participantes y cambiar administradores solo lo
+        // hace un administrador del grupo. Sin esta comprobacion, un
+        // miembro cualquiera podria reescribir la lista y quedarse con el
+        // control del grupo.
+        || (
+          soyAdminDe(conversacionId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['participantes', 'administradores', 'actualizado'])
+        )
+      );
+
+      allow delete: if esAdmin() || soyAdminDe(conversacionId);
+
+      // ---------------------------------------------------------------
+      // /conversaciones/{id}/ajustes/{uid}
+      // Silenciado, fijado, archivado y etiqueta: personales.
+      //
+      // El id del documento ES el uid, asi que cada quien escribe solo en
+      // el suyo. Silenciar un grupo es cosa mia, no de los demas.
+      // ---------------------------------------------------------------
+      match /ajustes/{uid} {
+        allow read: if esAdmin() || miUid() == uid;
+        allow write: if request.auth != null && miUid() == uid;
+      }
+
+      // ---------------------------------------------------------------
+      // /conversaciones/{id}/tecleando/{uid}
+      // El "esta escribiendo..." de cada persona.
+      //
+      // Va en su propio subdocumento para que dos personas escribiendo a
+      // la vez no se pisen: cada una escribe la suya y nada mas.
+      // ---------------------------------------------------------------
+      match /tecleando/{uid} {
+        allow read: if esAdmin() || soyParticipante(conversacionId);
+        allow write: if request.auth != null
+          && miUid() == uid
+          && soyParticipante(conversacionId);
+      }
+    }
+
+    // =================================================================
     // /mensajes/{conversacionId}/mensaje/{mensajeId}
+    //
+    // Solo los del chat. El estado de entrega se puede tocar con reglas
+    // distintas segun quien lo escribe:
+    //  - el autor marca "entregado" y "leido" de sus propios mensajes,
+    //  - el que recibe marca "leido" de los que le llegan.
     // =================================================================
     match /mensajes/{conversacionId}/mensaje/{mensajeId} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null
-        && request.resource.data.autor == miUid();
+      allow read: if esAdmin() || soyParticipante(conversacionId);
+
+      allow create: if soyParticipante(conversacionId)
+        && request.resource.data.autor == miUid()
+        && request.resource.data.keys().hasAll([
+             'autor', 'texto', 'creado'
+           ])
+        && request.resource.data.keys().hasOnly([
+             'conversacion', 'autor', 'autorNombre', 'texto', 'tipo',
+             'creado', 'creadoMs', 'estado', 'respondeA',
+             'textoRespondido', 'autorRespondido', 'reenviadoDe',
+             'urlImagen', 'nombreArchivo', 'eliminado', 'destacado',
+             'expira'
+           ])
+        && request.resource.data.texto is string
+        && request.resource.data.texto.size() <= 8000;
+
       allow update: if esAdmin() || (
-        request.auth != null
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['leido'])
+        soyParticipante(conversacionId)
+        && (
+          // El autor ajusta el estado de lo que escribio.
+          (resource.data.autor == miUid()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['estado']))
+          // Cualquier participante puede marcar como leido, porque lo
+          // leido lo marca el que recibe, no el que escribe.
+          || (request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['estado'])
+              && request.resource.data.estado == 'leido')
+          // El autor puede borrar para todos y destacar sus mensajes.
+          || (resource.data.autor == miUid()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['eliminado', 'texto', 'urlImagen', 'textoRespondido', 'destacado']))
+        )
       );
+
       allow delete: if esAdmin() || (
-        request.auth != null && resource.data.autor == miUid()
+        soyParticipante(conversacionId) && resource.data.autor == miUid()
       );
+    }
+
+    // =================================================================
+    // /negocios/{uid}
+    // Perfil comercial, catalogo, respuestas y etiquetas.
+    //
+    // Todo esto es PUBLICO, como el escaparate de una tienda: cualquiera
+    // autenticado lo puede ver para saber a que se dedica la cuenta. Pero
+    // escribir es solo del dueno.
+    //
+    // OJO con "activo": NO esta en la lista de campos que se pueden
+    // cambiar con un update normal. El interruptor de cuenta de empresa se
+    // controla aparte, en /usuarios/{uid}, y las reglas de ahi obligan a
+    // que los dos sitios digan lo mismo. Asi nadie puede encender su
+    // catalogo por la puerta de atrás sin pasar por la cuenta.
+    // =================================================================
+    match /negocios/{uid} {
+
+      allow read: if request.auth != null;
+
+      allow create: if miUid() == uid;
+
+      allow update: if miUid() == uid && (
+        // El interruptor "activo" SÍ se puede cambiar aquí, y solo por el
+        // dueño. Es lo que hace posible el botón de activar/desactivar
+        // empresa. No queda ningún hueco: quien lo cambia es el propio
+        // dueño de su catálogo, así que no puede afectar a nadie más.
+        request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['activo', 'actualizado'])
+        || request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly([
+               'nombreComercial', 'descripcion', 'categoria', 'direccion',
+               'telefono', 'correo', 'sitioWeb', 'instagram', 'facebook',
+               'horario', 'abierto', 'mensajeBienvenida', 'mensajeAusencia',
+               'etiquetaPorDefecto', 'actualizado'
+             ])
+      );
+
+      allow delete: if esAdmin() || miUid() == uid;
+
+      // Catalogo de productos.
+      match /catalogo/{productoId} {
+        allow read: if request.auth != null;
+        allow write: if miUid() == uid;
+      }
+
+      // Respuestas rapidas.
+      match /respuestas/{respuestaId} {
+        allow read: if request.auth != null;
+        allow write: if miUid() == uid;
+      }
+
+      // Etiquetas de las conversaciones.
+      match /etiquetas/{etiquetaId} {
+        allow read: if request.auth != null;
+        allow write: if miUid() == uid;
+      }
+    }
+
+    // =================================================================
+    // /bloqueos/{uid}/bloqueados/{otroUid}
+    // A quien tiene bloqueado cada persona.
+    //
+    // Vive bajo el uid del que bloquea, asi que la lista es privada:
+    // nadie mas ve a quien tienes bloqueado.
+    // =================================================================
+    match /bloqueos/{uid} {
+      allow read, write: if esAdmin() || miUid() == uid;
+
+      match /bloqueados/{otroUid} {
+        allow read: if esAdmin() || miUid() == uid;
+        allow write: if esAdmin() || miUid() == uid;
+      }
+    }
+
+    // =================================================================
+    // /reportes/{id}
+    // Denuncias de usuarios.
+    //
+    // Quien denuncia puede ver SU denuncia para saber que se envio.
+    // El administrador ve todas. Nadie mas.
+    // =================================================================
+    match /reportes/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+             'reportadoUid', 'reportadaPor', 'motivo', 'detalle', 'creado'
+           ])
+        && request.resource.data.reportadaPor == miUid()
+        && request.resource.data.reportadoUid != miUid();
+
+      allow read: if esAdmin() || (
+        request.auth != null && resource.data.reportadaPor == miUid()
+      );
+
+      allow update, delete: if esAdmin();
     }
 
     // =================================================================
