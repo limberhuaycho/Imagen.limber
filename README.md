@@ -19,7 +19,8 @@ Proyecto de clase. App Android (Kotlin + Compose) + panel web de administración
 
 1. **Registro e inicio de sesión por número de teléfono**, con un código
    de 6 dígitos.
-2. Si el número **no tiene cuenta**, la app lo dice antes de dejar pasar.
+2. El número se pide siempre: la app nunca bloquea el acceso. Quién
+   autoriza a una persona eres tú, desde el panel.
 3. **Mensajería real** número a número usando Firebase como puente.
 4. Los mensajes se **borran de Firebase a los 7 días** y quedan guardados
    solo en el teléfono de cada quien.
@@ -89,13 +90,14 @@ manda el código a mano desde el panel: así no se gasta nada.
 ## El flujo completo
 
 **Registro**
-1. La persona escribe su número.
-2. La app mira `numeros/{numero}`.
-   - Si no existe → *"Ese número no tiene cuenta"*.
-   - Si existe → pide el código.
-3. Crea un documento en `solicitudes` para avisarte.
-4. Tú entras al panel, generas el código y se lo envías por correo o WhatsApp.
+1. La persona escribe su número y confirma que está bien.
+2. La app genera sola el código de 6 dígitos y lo deja listo en el panel.
+3. En la pantalla le pide el código en 6 casillas, con el texto
+   *"Revisa tu WhatsApp o SMS"*.
+4. Tú entras al panel, copias el código y se lo envías por WhatsApp o SMS.
 5. La persona lo escribe y queda verificada.
+6. Si el código no coincide, se rechaza y se gasta un intento (5 en total).
+   El código caduca a los 10 minutos; *"Reenviar código"* genera uno nuevo.
 
 **Verificación de la empresa**
 1. En el panel, sección 3, escribes el número y pulsas **Marcar verificado**.
