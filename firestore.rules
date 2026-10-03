@@ -12,33 +12,79 @@ service cloud.firestore {
       return request.auth != null ? request.auth.uid : '';
     }
 
-    match /numeros/{clave} {
+    // Documento del codigo generado por el administrador.
+    function codigoDe(numero) {
+      return get(/databases/$(database)/documents/codigos/$(numero));
+    }
+
+    // =================================================================
+    // /numeros/{numero}
+    // Directorio. Sirve para saber si un numero existe.
+    // =================================================================
+    match /numeros/{numero} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if esAdmin();
     }
 
-    match /codigos/{clave} {
+    // =================================================================
+    // /codigos/{numero}
+    // Solo el administrador. Nadie mas puede leerlos, ni siquiera
+    // quien esta escribiendo el codigo en la app.
+    // =================================================================
+    match /codigos/{numero} {
       allow read: if esAdmin();
       allow create, update, delete: if esAdmin();
     }
 
+    // =================================================================
+    // /intentos/{uid}
+    // El usuario escribe el codigo que recibio y las reglas lo comparan
+    // con el guardado por el admin usando get(). Si coincide, el propio
+    // documento queda marcado como valido y el usuario ya puede
+    // registrarse. El codigo nunca sale de aqui.
+    // =================================================================
+    match /intentos/{uid} {
+      allow read: if miUid() == uid;
+      allow create: if miUid() == uid
+        && request.resource.data.keys().hasOnly(['numero', 'codigo', 'fecha'])
+        && codigoDe(request.resource.data.numero).data.codigo
+             == request.resource.data.codigo
+        && codigoDe(request.resource.data.numero).data.usado == false
+        && codigoDe(request.resource.data.numero).data.expira
+             > request.time;
+    }
+
+    // =================================================================
+    // /solicitudes/{id}
+    // Peticiones que ve el administrador en el panel.
+    // =================================================================
     match /solicitudes/{id} {
       allow read, delete: if esAdmin();
       allow create: if request.auth != null;
       allow update: if esAdmin();
     }
 
+    // =================================================================
+    // /usuarios/{uid}
+    // =================================================================
     match /usuarios/{uid} {
-      allow read, write: if esAdmin() || (request.auth != null && miUid() == uid);
+      allow read, write: if esAdmin() || miUid() == uid;
     }
 
+    // =================================================================
+    // /mensajes/{conversacionId}/mensaje/{mensajeId}
+    // =================================================================
     match /mensajes/{conversacionId}/mensaje/{mensajeId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.autor == miUid();
       allow update, delete: if esAdmin();
     }
 
+    // =================================================================
+    // /config/{documento}
+    // =================================================================
     match /config/{documento} {
       allow read: if true;
       allow write: if esAdmin();
