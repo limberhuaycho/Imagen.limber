@@ -132,12 +132,16 @@
       </p>
     </div>
     <div class="card">
-      <h2>2. Codigos generados por la app</h2>
+      <h2 style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <span>2. Codigos generados por la app</span>
+        <button class="sec" id="btnActualizar">Actualizar</button>
+      </h2>
       <p class="info" style="margin-bottom:12px">
         Estos codigos los genera sola la app cuando alguien escribe su
         numero. Mandaselos por correo o WhatsApp y la persona los
-        escribe en su telefono para entrar.
+        escribe en su telefono para entrar. La tabla se actualiza sola.
       </p>
+      <p class="info" id="estadoDirecto" style="margin-bottom:12px;color:#008069;font-weight:600"></p>
       <div id="tablaSolicitudes"></div>
     </div>
 

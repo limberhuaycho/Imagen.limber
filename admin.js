@@ -225,59 +225,120 @@ window.copiar = function (texto) {
 // 2. Codigos que genero la app al escribir un numero
 // ---------------------------------------------------------------------
 
-async function cargarSolicitudes() {
+let pararEscucha = null;
+let relojVence = null;
+let ultimoSnap = null;
+
+/** Dibuja la tabla a partir de una foto de /codigos. */
+function pintarSolicitudes(snap) {
   const cont = document.getElementById("tablaSolicitudes");
-  try {
-    const snap = await getDocs(collection(db, "codigos"));
-    const filas = [];
+  if (!cont) return;
 
-    snap.forEach(s => {
-      const d = s.data();
-      const num = d.numero || s.id;
+  const filas = [];
+  const ahora = Date.now();
 
-      // Caducado a los 10 minutos de generarse.
-      const expira = d.expira?.toMillis?.() ?? d.expira ?? 0;
-      const vencido = Date.now() > expira;
-      const usado = d.usado === true;
+  snap.forEach(s => {
+    const d = s.data();
+    const num = d.numero || s.id;
 
-      const estado = usado
-        ? '<span class="chip ok">usado</span>'
-        : (vencido
-          ? '<span class="chip no">caducado</span>'
-          : '<span class="chip pend">esperando</span>');
+    const creado = d.creado?.toMillis?.() ?? d.creado ?? 0;
+    const expira = d.expira?.toMillis?.() ?? d.expira ?? 0;
+    const vencido = expira > 0 && ahora > expira;
+    const usado = d.usado === true;
+    const intentos = d.intentos ?? 0;
 
-      const quedan = vencido
-        ? "-"
-        : Math.max(0, Math.ceil((expira - Date.now()) / 60000)) + " min";
+    // Pendiente = todavia sin usar y sin caducar.
+    const estado = usado
+      ? '<span class="chip ok">usado</span>'
+      : (vencido
+        ? '<span class="chip no">expirado</span>'
+        : '<span class="chip pend">pendiente</span>');
 
-      filas.push(`
-        <tr>
-          <td>+${escapeHtml(num)}</td>
-          <td class="codigo" style="font-size:1.25rem">${escapeHtml(d.codigo || "-")}</td>
-          <td>${escapeHtml(fechaBonita(d.creado))}</td>
-          <td>${quedan}</td>
-          <td>${estado}</td>
-          <td>
-            <div class="acciones">
-              <button class="sec" onclick="copiar('${escapeHtml(d.codigo || "")}')">Copiar</button>
-              <button class="peligro" onclick="borrarCodigo('${escapeHtml(num)}')">Borrar</button>
-            </div>
-          </td>
-        </tr>`);
-    });
+    const quedan = vencido || !expira
+      ? "-"
+      : Math.max(0, Math.ceil((expira - ahora) / 60000)) + " min";
 
-    // Primero los que siguen esperando.
-    filas.sort((a, b) => (a.includes("esperando") ? -1 : 1));
+    filas.push(`
+      <tr>
+        <td>+${escapeHtml(num)}</td>
+        <td class="codigo" style="font-size:1.25rem">${escapeHtml(d.codigo || "-")}</td>
+        <td>${escapeHtml(fechaBonita(creado))}</td>
+        <td>${escapeHtml(expira ? fechaBonita(expira) : "-")}</td>
+        <td>${quedan}</td>
+        <td>${estado}</td>
+        <td>${intentos}</td>
+        <td>
+          <div class="acciones">
+            <button class="sec" onclick="copiar('${escapeHtml(d.codigo || "")}')">Copiar</button>
+            <button class="peligro" onclick="borrarCodigo('${escapeHtml(num)}')">Borrar</button>
+          </div>
+        </td>
+      </tr>`);
+  });
 
-    cont.innerHTML = filas.length
-      ? `<table><thead><tr>
-          <th>Numero</th><th>Codigo</th><th>Creado</th><th>Vence</th><th>Estado</th><th></th>
-         </tr></thead><tbody>${filas.join("")}</tbody></table>`
-      : '<div class="vacio">Todavia no hay codigos. Cuando alguien escriba su numero en la app, aparecera aqui.</div>';
-  } catch (e) {
-    cont.innerHTML = `<div class="vacio">No se pudieron leer: ${escapeHtml(e.message)}</div>`;
+  // Arriba lo que sigue esperando: es lo que hay que mandar primero.
+  filas.sort((a, b) => (a.includes("chip pend") ? -1 : 1));
+
+  cont.innerHTML = filas.length
+    ? `<table><thead><tr>
+        <th>Numero</th><th>Codigo</th><th>Creado</th><th>Expira</th>
+        <th>Vence</th><th>Estado</th><th>Intentos</th><th></th>
+       </tr></thead><tbody>${filas.join("")}</tbody></table>`
+    : '<div class="vacio">Todavia no hay codigos. Cuando alguien escriba su numero en la app, aparecera aqui.</div>';
+
+  const marca = document.getElementById("estadoDirecto");
+  if (marca) {
+    marca.textContent = snap.size
+      ? snap.size + " codigo(s) · " + new Date().toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      : "";
   }
 }
+
+/**
+ * Escucha /codigos en vivo. Cada codigo nuevo que genera la app aparece
+ * solo, sin pulsar nada y sin recargar la pagina.
+ */
+function escucharSolicitudes() {
+  if (pararEscucha) return;
+
+  pararEscucha = onSnapshot(
+    collection(db, "codigos"),
+    snap => {
+      ultimoSnap = snap;
+      pintarSolicitudes(snap);
+    },
+    err => {
+      const cont = document.getElementById("tablaSolicitudes");
+      if (cont) {
+        cont.innerHTML = `<div class="vacio">No se pudieron leer: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+  );
+
+  // El "vence en X min" baja solo: hay que repintar cada medio minuto.
+  clearInterval(relojVence);
+  relojVence = setInterval(() => {
+    if (ultimoSnap) pintarSolicitudes(ultimoSnap);
+  }, 30000);
+}
+
+/** Boton "Actualizar": relee una vez, por si se quedo sin conexion. */
+async function cargarSolicitudes() {
+  const cont = document.getElementById("tablaSolicitudes");
+  if (cont) cont.innerHTML = '<div class="vacio">Cargando...</div>';
+  try {
+    const snap = await getDocs(collection(db, "codigos"));
+    ultimoSnap = snap;
+    pintarSolicitudes(snap);
+  } catch (e) {
+    if (cont) cont.innerHTML = `<div class="vacio">No se pudieron leer: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+document.getElementById("btnActualizar").onclick = () => {
+  cargarSolicitudes();
+  cargarVerificados();
+};
 
 /** Borra un codigo para que la app pueda generar otro. */
 window.borrarCodigo = async function (numero) {
@@ -431,7 +492,8 @@ window.borrarMsg = async function (chatId, msgId) {
 // ---------------------------------------------------------------------
 
 function cargarTodo() {
-  cargarSolicitudes();
+  // Escucha en vivo: los codigos que genera la app aparecen solos.
+  escucharSolicitudes();
   cargarVerificados();
   cargarMensajes();
 }
